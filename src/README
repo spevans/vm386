@@ -16,6 +16,8 @@ drivers/physical/kbd/		Keyboard driver
 drivers/physical/kbd/keymaps/	Keyboard Keymaps
 drivers/physical/ramdisk/	Ramdisk
 drivers/physical/tty/ 		Character-based virtual consoles
+drivers/physical/printer	Printer port driver			*	
+drivers/physcial/serial		Serial port driver			*	
 drivers/virtual/		Virtual device emulation
 drivers/virtual/vbios/ 		Virtual BIOS
 drivers/virtual/vcmos/		Virtual CMOS
@@ -27,7 +29,8 @@ drivers/virtual/vkbd/ 		Virtual keyboard
 drivers/virtual/vm/ 		Virtual machines
 drivers/virtual/vpic/		Virtual PIC
 drivers/virtual/vpit/		Virtual PIT
-drivers/virtual/vprinter/ 	Virtual printer port
+drivers/virtual/vprinter/ 	Virtual printer port			*
+drivers/virtual/vserial/ 	Virtual serial port 			*
 fs/				Native filing system
 fs/test/			File system test code
 kernel/				Kernel code
@@ -46,3 +49,6 @@ vmm/				System-wide include files
 syslogd/			System message logger
 output/				Binaries output directory
 spooler/			Print spooler
+
+
+[*] - created but not yet filled

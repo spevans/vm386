@@ -387,6 +387,15 @@ vdma_out(struct vm *vm, u_short port, int size, u_long val)
 }
 
 
+void
+get_dma_info(struct vm *vm, u_int channel, struct channel_info *info)
+{
+}
+
+void
+set_dma_info(struct vm *vm, u_int channel, struct channel_info *info)
+{
+}
 
 
 /* Module stuff. */

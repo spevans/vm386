@@ -113,6 +113,21 @@ create_vprinter(struct vm *vmach, int argc, char **argv)
 
 
 
+void
+printer_write_char (struct vm *vm, struct vm86_regs *regs)
+{
+}
+
+void
+printer_initialise (struct vm *vm, struct vm86_regs *regs)
+{
+}
+
+void
+printer_get_status (struct vm *vm, struct vm86_regs *regs)
+{
+}
+
 
 u_short
 new_spool_file(struct vm *vm, u_short port)
@@ -189,7 +204,7 @@ vprinter_out(struct vm *vm, u_short port, int size, u_long val)
             switch(offset) {
                 case 0:	/* data output port */
 		v->last_data_val[i] = (u_short)val;
-                return;	
+                return;	/* ignore the output for now */
 
                 case 1: /* printer status */
                 return; /* ignore writes to the status register */
