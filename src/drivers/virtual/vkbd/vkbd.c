@@ -346,7 +346,7 @@ vkbd_write_port(struct vm *vmach, u_short port, int size, u_long val)
 		break;
 
 	    default:
-		kprintf("vkbd: Unexpected second half of 8042 command: %d, %d.\n",
+		kprintf("vkbd: Unexpected second half of 8042 command: %02x, %02x.\n",
 			vk->this_8042_command, val);
 	    }
 	    vk->this_8042_command = 0;
@@ -366,13 +366,15 @@ vkbd_write_port(struct vm *vmach, u_short port, int size, u_long val)
 		break;
 
 	    case KB_KBD_SET_TYPEMATIC:
+		if(val & 0x80)
+		    goto do_kbd_cmd;
 		/* Unimplemented. */
 		kprintf("vkbd: Typematic keys are unimplemented.\n");
 		vkbd_in(vk, KB_REP_ACK);
 		break;
 
 	    default:
-		kprintf("vkbd: Unexpected second half of keyboard command: %d, %d\n",
+		kprintf("vkbd: Unexpected second half of keyboard command: %02x, %02x\n",
 		     vk->this_kbd_command, val);
 	    }
 	    vk->this_kbd_command = 0;
@@ -416,7 +418,7 @@ vkbd_write_port(struct vm *vmach, u_short port, int size, u_long val)
 		break;
 
 	    default:
-		kprintf("vkbd: Unknown keyboard command: %d\n", val);
+		kprintf("vkbd: Unknown keyboard command: %02x\n", val);
 	    }
 	}
 	break;

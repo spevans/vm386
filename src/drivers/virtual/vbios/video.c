@@ -123,17 +123,30 @@ bios_scroll_up(struct tty *vmtty, u_int num_lines, u_char attr, u_int left_col,
     }
     else
     {
-	for(i = left_row + num_lines; i <= right_row; i++)
+        char *src, *dest;
+        int count, width;
+ 
+        count = right_col - left_col + 1;
+        count *= 2;
+ 
+        width = 2 * TTY_COLS(vmtty);
+ 
+        src = TTY_VMEM + (left_col * 2);
+        src += (left_row + num_lines) * width;
+        dest = TTY_VMEM + (left_col * 2);
+        dest += left_row * width; 
+ 
+	for(left_row += num_lines - 1; left_row != right_row; left_row++)
 	{
-	    memcpy_user(TTY_VMEM + (left_col * 2) + (i * TTY_COLS(vmtty) * 2),
-			TTY_VMEM + (left_col * 2) + ((i - num_lines)
-						     * TTY_COLS(vmtty) * 2),
-			(right_col - left_col + 1) * 2);
+            memcpy_user(dest, src, count);
+            dest += width;
+            src += width;
 	}
-	for(i = right_row - num_lines; i <= right_row; i++)
+ 
+	while(num_lines--)
 	{
-	    memsetw_user(TTY_VMEM + (left_col * 2) + (i * TTY_COLS(vmtty) * 2),
-			 attr << 8, right_col - left_col + 1);
+	    memsetw_user(dest, (attr << 8) | 0x20, right_col - left_col + 1);
+            dest += width;
 	}
     }
 }
@@ -159,17 +172,30 @@ bios_scroll_down(struct tty *vmtty, u_int num_lines, u_char attr,
     }
     else
     {
-	for(i = right_row - num_lines; i >= left_row; i--)
+        char *src, *dest;
+        int count, width;
+ 
+        count = right_col - left_col + 1;
+        count *= 2;
+ 
+        width = 2 * TTY_COLS(vmtty);
+ 
+        src = TTY_VMEM + (left_col * 2);
+        src += (right_row - num_lines) * width;
+        dest = TTY_VMEM + (left_col * 2);
+        dest += right_row * width;
+ 
+        for(right_row -= (num_lines - 1); right_row != left_row; right_row--)
 	{
-	    memcpy_user(TTY_VMEM + (left_col * 2) + (i * TTY_COLS(vmtty) * 2),
-			TTY_VMEM + (left_col * 2) + ((i - num_lines)
-						     * TTY_COLS(vmtty) * 2),
-			(right_col - left_col + 1) * 2);
+            memcpy_user(dest, src, count);
+            dest -= width;
+            src -= width;
 	}
-	for(i = left_row; i < (left_row + num_lines); i++)
+ 
+        while(num_lines--)
 	{
-	    memsetw_user(TTY_VMEM + (left_col * 2) + (i * TTY_COLS(vmtty) * 2),
-			 attr << 8, right_col - left_col + 1);
+            memsetw_user(dest, (attr << 8) | 0x20, right_col - left_col + 1);
+            dest -= width;
 	}
     }
 }

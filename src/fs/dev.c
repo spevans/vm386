@@ -150,9 +150,12 @@ bool
 read_meta_data(struct fs_device *dev)
 {
     static struct boot_blk tmp_bb;
-    ERRNO = FS_READ_BLOCKS(dev, BOOT_BLK, &tmp_bb, 1);
-    if(ERRNO < 0)
+    long result = FS_READ_BLOCKS(dev, BOOT_BLK, &tmp_bb, 1);
+    if(result < 0)
+    {
+	ERRNO = -result;
 	return FALSE;
+    }
     if((tmp_bb.magic != FS_BOOT_MAGIC)
        && (tmp_bb.magic != FS_NOBOOT_MAGIC))
     {

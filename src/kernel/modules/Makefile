@@ -15,7 +15,7 @@ STATIC_MODS := $(foreach mod, $(shell cat $(TOPDIR)/STATIC), $(TOPDIR)/$(mod).o)
 example.module : example_mod.o
 
 modules.o : $(OBJS) __first.o $(STATIC_MODS) __last.o $(TOPDIR)/STATIC
-	$(LD) -r -o modules.o $(filter %.o, $^)
+	$(XLD) -r -o modules.o $(filter %.o, $^)
 
 clean :
 	rm -f *~ *.[od] example.module mld mstrip objlist mdump core

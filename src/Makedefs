@@ -1,14 +1,27 @@
 # System-wide make definitions
 
 CC := gcc -I$(TOPDIR)
-CPP := /lib/cpp -I$(TOPDIR)
 LD := ld
 AS := as
+
+# Make sure we always use an a.out compiler for bits of the system..
+ifndef ELF_INSTALLED
+  _XCC := gcc
+  XLD := ld
+  XAS := as
+else
+  _XCC := gcc -b i486-linuxaout -V 2.6.2
+  XLD := ld-aout
+  XAS := as-aout
+endif
+
+XCC := $(_XCC) -I$(TOPDIR)
+CPP := /lib/cpp -I$(TOPDIR)
+AS86 := as86
+LD86 := ld86
 AR := ar
 STRIP := strip
 NM := nm
-AS86 := as86
-LD86 := ld86
 
 MLD := $(TOPDIR)/kernel/modules/mld
 MSTRIP := $(TOPDIR)/kernel/modules/mstrip
@@ -19,17 +32,20 @@ ifndef TEST
 CFLAGS += -fomit-frame-pointer
 endif
 
+% : %.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $<
+
 %.o : %.c
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $@ $<
+	$(XCC) $(CPPFLAGS) $(CFLAGS) -c -o $@ $<
 
 %.s : %.c
-	$(CC) $(CPPFLAGS) $(CFLAGS) -S -o $@ $<
+	$(XCC) $(CPPFLAGS) $(CFLAGS) -S -o $@ $<
 
 %.o : %.s
-	$(AS) -o $@ $<
+	$(XAS) -o $@ $<
 
 %.o : %.S
-	$(CC) $(CPPFLAGS) -c -o $@ $<
+	$(XCC) $(CPPFLAGS) -c -o $@ $<
 
 %.map : %.o
 	$(NM) $< | grep -v '_compiled' | sort >$@
@@ -58,7 +74,7 @@ endif
 #	include $(SRCS:.c=.d)
 #
 %.d : %.c
-	$(SHELL) -ec '$(CC) -M $(CPPFLAGS) $< | sed '\''s/$*.o/& $@/g'\'' > $@'
+	$(SHELL) -ec '$(XCC) -M $(CPPFLAGS) $< | sed '\''s/$*.o/& $@/g'\'' > $@'
 
 # Definitions for linking modules. Basically each module has something like
 # the following in its Makefile:
@@ -70,9 +86,9 @@ endif
 # the module's `struct module'. For a module `FOO', this symbol must be
 # `_FOO_module'.
 %.module :
-	$(CC) -c $(TOPDIR)/kernel/modules/crt0.S -o $*_crt0.o -DMODNAME=$*
-	$(CC) -c $(TOPDIR)/kernel/modules/crt1.S -o $*_crt1.o -DMODNAME=$*
-	$(LD) $(LDFLAGS) -r $*_crt0.o $^ $*_crt1.o -o $@.o
+	$(XCC) -c $(TOPDIR)/kernel/modules/crt0.S -o $*_crt0.o -DMODNAME=$*
+	$(XCC) -c $(TOPDIR)/kernel/modules/crt1.S -o $*_crt1.o -DMODNAME=$*
+	$(XLD) $(LDFLAGS) -r $*_crt0.o $^ $*_crt1.o -o $@.o
 	$(NM) $@.o | grep -v '_compiled' | sort >$@.map
 	$(MSTRIP) $(MSTRIPFLAGS) $@.o -s _kernel -s _$*_module
 	$(MLD) $(MLDFLAGS) -o $@ $@.o

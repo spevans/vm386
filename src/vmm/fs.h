@@ -201,8 +201,8 @@ struct fs_device {
     /* The name of the device, used in path names (i.e. `DEV:foo/bar') */
     const char *name;
 
-    /* These return >=0 on success, or an E_?? value on error. If
-       no disk is present they should return E_NODISK.
+    /* These return >=0 on success, or a negative E_?? value on error. If
+       no disk is present they should return -E_NODISK.
          These functions may put the current task to sleep if they
        want to.
          Note that BLOCK and COUNT are in terms of FS_BLKSIZ sized blocks. */

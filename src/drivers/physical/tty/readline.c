@@ -657,6 +657,7 @@ readline(struct tty *tty, size_t *lengthp)
 
 		case '[':
 		    rl.in_cursor = rl.had_esc = TRUE;
+		    rl.next_prefix_arg = rl.current_prefix_arg;
 		    break;
 
 		case '<':

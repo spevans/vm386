@@ -291,11 +291,13 @@ void
 sleep_in_task_list(struct task_list **head)
 {
     struct task_list tl;
+    forbid();
     tl.task = current_task;
     tl.pid = current_task->pid;
     add_task_list(head, &tl);
     suspend_task(current_task);
     schedule();
+    permit();
 }
 
 /* Wake up all tasks contained in the task-list pointed to by HEAD then

@@ -113,7 +113,7 @@ dev_read_blocks(void *unused, blkno blk, void *buf, int count)
 {
     long actual;
     if(no_disk)
-	return E_NODISK;
+	return -E_NODISK;
     if(lseek(dev_fd, blk * FS_BLKSIZ, SEEK_SET) < 0)
     {
 	perror("read_block:lseek");
@@ -123,12 +123,12 @@ dev_read_blocks(void *unused, blkno blk, void *buf, int count)
     if(actual < 0)
     {
 	if(errno == EIO)
-	    return E_IO;
+	    return -E_IO;
 	perror("read_block:read");
 	abort();
     }
     if(actual < FS_BLKSIZ)
-	return E_IO;
+	return -E_IO;
     return actual;
 }
 
@@ -137,7 +137,7 @@ dev_write_blocks(void *unused, blkno blk, void *buf, int count)
 {
     long actual;
     if(no_disk)
-	return E_NODISK;
+	return -E_NODISK;
     if(lseek(dev_fd, blk * FS_BLKSIZ, SEEK_SET) < 0)
     {
 	perror("write_block:lseek");
@@ -147,14 +147,14 @@ dev_write_blocks(void *unused, blkno blk, void *buf, int count)
     if(actual < 0)
     {
 	if(errno == EIO)
-	    return E_IO;
+	    return -E_IO;
 	else if(errno == ENOSPC)
-	    return E_NOSPC;
+	    return -E_NOSPC;
 	perror("write_block:write");
 	abort();
     }
     if(actual < FS_BLKSIZ)
-	return E_IO;
+	return -E_IO;
     return actual;
 }
 

@@ -11,7 +11,7 @@ include $(TOPDIR)/Makedefs
 CFLAGS += -DKERNEL
 
 misc.o : $(OBJS)
-	$(LD) -r -o misc.o $(OBJS)
+	$(XLD) -r -o misc.o $(OBJS)
 
 clean :
 	rm -f *~ *.[od]

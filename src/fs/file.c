@@ -336,7 +336,10 @@ bool
 truncate_file(struct file *file)
 {
     if(file == NULL)
-	return ERRNO = E_BADARG;
+    {
+	ERRNO = E_BADARG;
+	return FALSE;
+    }
     return delete_inode_data(file->inode);
 }
 
@@ -344,7 +347,10 @@ bool
 set_file_size(struct file *file, size_t size)
 {
     if(file == NULL)
-	return ERRNO = E_BADARG;
+    {
+	ERRNO = E_BADARG;
+	return FALSE;
+    }
     F_SIZE(file) = size;
     file->inode->dirty = TRUE;
     write_inode(file->inode);

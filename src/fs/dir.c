@@ -398,7 +398,10 @@ make_link(const char *name, struct file *src)
     struct file *dir;
     bool rc = FALSE;
     if(src == NULL)
-	return ERRNO = E_BADARG;
+    {
+	ERRNO = E_BADARG;
+	return FALSE;
+    }
     if(!test_media(src->inode->dev))
 	return FALSE;
     dir = find_parent(&name);

@@ -17,6 +17,9 @@ TOPDIR = ../..
 TEST = YES
 include $(TOPDIR)/Makedefs
 
+# Compiling for local execution
+XCC = $(CC)
+
 CFLAGS += -g -DTEST -DTEST_FS -DTEST_SHELL -DFS_MODULE -DSHELL_MODULE -DKERNEL
 
 fs : $(OBJS)

@@ -34,14 +34,14 @@ long floppy_write_blocks(fd_dev_t *fd, void *buf, u_long block, int count)
 long floppy_read_block(void *fd, blkno block, void *buf, int count)
 {
 	return floppy_read_blocks((fd_dev_t *)fd,
-		buf, block * FACTOR, count * FACTOR) ? 1 : E_IO;
+		buf, block * FACTOR, count * FACTOR) ? 1 : -E_IO;
 }
 
 
 long floppy_write_block(void *fd, blkno block, void *buf, int count)
 {
 	return floppy_write_blocks((fd_dev_t *)fd,
-		buf, block * FACTOR, count * FACTOR) ? 1 : E_IO;
+		buf, block * FACTOR, count * FACTOR) ? 1 : -E_IO;
 }
 
 

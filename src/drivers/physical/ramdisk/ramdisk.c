@@ -231,7 +231,7 @@ long
 ramdisk_fs_read_blocks(void *f, blkno block, void *buf, int count)
 {
 	return ramdisk_read_blocks(f, buf, block * (FS_BLKSIZ / 512),
-				   count * (FS_BLKSIZ / 512)) ? 1 : E_IO;
+				   count * (FS_BLKSIZ / 512)) ? 1 : -E_IO;
 }
 
 
@@ -239,7 +239,7 @@ long
 ramdisk_fs_write_blocks(void *f, blkno block, void *buf, int count)
 {
 	return ramdisk_write_blocks(f, buf, block * (FS_BLKSIZ / 512),
-				    count * (FS_BLKSIZ / 512)) ? 1 : E_IO;
+				    count * (FS_BLKSIZ / 512)) ? 1 : -E_IO;
 }
 
 

@@ -279,14 +279,14 @@ static long
 hd_fs_read_blocks(void *p, blkno block, void *buf, int count)
 {
     return hd_read_blocks(p, buf, block * (FS_BLKSIZ / 512),
-			  count * (FS_BLKSIZ / 512)) ? 1 : E_IO;
+			  count * (FS_BLKSIZ / 512)) ? 1 : -E_IO;
 }
 
 static long
 hd_fs_write_blocks(void *p, blkno block, void *buf, int count)
 {
     return hd_write_blocks(p, buf, block * (FS_BLKSIZ / 512),
-			   count * (FS_BLKSIZ / 512)) ? 1 : E_IO;
+			   count * (FS_BLKSIZ / 512)) ? 1 : -E_IO;
 }
 
 /* Mount the logical partition P in the file system. If READ-ONLY is TRUE

@@ -206,8 +206,9 @@ cmd_cd(struct shell *sh, int argc, char **argv)
 	struct file *dir = open_file(argv[0], F_READ | F_WRITE | F_ALLOW_DIR);
 	if(dir != NULL)
 	{
-	    struct file *old = swap_current_dir(dir);
+	    struct file *old;
 	    ERRNO = E_OK;
+ 	    old = swap_current_dir(dir);
 	    if(old != NULL)
 		close_file(old);
 	    if(ERRNO == E_OK)

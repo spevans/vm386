@@ -18,7 +18,8 @@ static struct buf_head buffer_pool[NR_BUFFERS];
 /* Some simple statistics. */
 u_long total_accessed, cached_accesses, dirty_accesses;
 
-static bool handle_device_error(struct buf_head *bh, int access_type);
+static bool handle_device_error(struct buf_head *bh, int access_type,
+				int errno);
 
 void
 init_buffers(void)
@@ -85,8 +86,10 @@ make_free_buffer(void)
 		remove_node(&x->link.node);
 		if(x->dirty)
 		{
-		    ERRNO = FS_WRITE_BLOCKS(x->dev, x->blkno, &x->buf, 1);
-		    if((ERRNO < 0) || !handle_device_error(x, F_WRITE))
+		    long result = FS_WRITE_BLOCKS(x->dev, x->blkno,
+						  &x->buf, 1);
+		    if((result < 0)
+		       || !handle_device_error(x, F_WRITE, -result))
 		    {
 			kprintf("buffer_cache: Can't write block %d to device %s\n",
 				x->blkno, x->dev->name);
@@ -139,6 +142,7 @@ again:
     else
     {
 	/* Couldn't find a cached copy of the buffer. Make a new one. */
+	long result;
 	if((x = bh_free_list) == NULL)
 	{
 	    if(make_free_buffer())
@@ -162,8 +166,8 @@ again:
 	   are synchronised. */
 	x->locked = TRUE;
 #endif
-	ERRNO = FS_READ_BLOCKS(dev, blk, &x->buf, 1);
-	if((ERRNO < 0) && !handle_device_error(x, F_READ))
+	result = FS_READ_BLOCKS(dev, blk, &x->buf, 1);
+	if((result < 0) && !handle_device_error(x, F_READ, -result))
 	{
 	    remove_node(&x->link.node);
 #ifndef TEST
@@ -258,11 +262,12 @@ bdirty(struct buf_head *bh, bool write_now)
     bh->dirty = TRUE;
     if(write_now)
     {
+	long result;
 	/* Have to clear this hear in case any other tasks come along and
 	   dirty the buffer while we're writing it. */
 	bh->dirty = FALSE;
-	ERRNO = FS_WRITE_BLOCKS(bh->dev, bh->blkno, &bh->buf.data, 1);
-	if((ERRNO < 0) && !handle_device_error(bh, F_WRITE))
+	result = FS_WRITE_BLOCKS(bh->dev, bh->blkno, &bh->buf.data, 1);
+	if((result < 0) && !handle_device_error(bh, F_WRITE, -result))
 	    bh->dirty = TRUE;
     }
 }
@@ -288,10 +293,11 @@ brelse(struct buf_head *bh)
 #ifndef LAZY_WRITES
     if(bh->dirty)
     {
+	long result;
 	/* see bdirty() */
 	bh->dirty = FALSE;
-	ERRNO = FS_WRITE_BLOCKS(bh->dev, bh->blkno, &bh->buf.data, 1);
-	if((ERRNO < 0) && !handle_device_error(bh, F_WRITE))
+	result = FS_WRITE_BLOCKS(bh->dev, bh->blkno, &bh->buf.data, 1);
+	if((result < 0) && !handle_device_error(bh, F_WRITE, -result))
 	    bh->dirty = TRUE;
     }
 #endif
@@ -329,11 +335,13 @@ flush_device_cache(struct fs_device *dev, bool dont_write)
    device access and return TRUE if it succeeded, FALSE if nothing could
    be done about the error.
    ACCESS-TYPE is either F_READ or F_WRITE showing what kind of access the
-   error occurred on (from the buffer BH). */
+   error occurred on (from the buffer BH).
+   ERRNO is the error type -- it will be put into the task's errno field. */
 static bool
-handle_device_error(struct buf_head *bh, int access_type)
+handle_device_error(struct buf_head *bh, int access_type, int errno)
 {
-    if(ERRNO == E_NODISK)
+    ERRNO = errno;
+    if(errno == E_NODISK)
     {
 	/* Some git removed the floppy, invalidate everything pointing
 	   to it. */

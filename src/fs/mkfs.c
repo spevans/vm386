@@ -26,6 +26,7 @@
 bool
 mkfs(struct fs_device *dev, u_long blocks, u_long reserved)
 {
+    long result;
     int tmp;
     blkno block;
     blk tmp_blk;
@@ -64,9 +65,12 @@ mkfs(struct fs_device *dev, u_long blocks, u_long reserved)
 	       root directory). */
 	    set_bit(TMP_BMAP_BLK, 0);
 	}
-	ERRNO = FS_WRITE_BLOCKS(dev, block, TMP_BMAP_BLK, 1);
-	if(ERRNO < 0)
+	result = FS_WRITE_BLOCKS(dev, block, TMP_BMAP_BLK, 1);
+	if(result < 0)
+	{
+	    ERRNO = -result;
 	    return FALSE;
+	}
 	if(block == sup.inode_bitmap)
 	    clear_bit(TMP_BMAP_BLK, 0);
 	tmp -= FS_BLKSIZ * 8;
@@ -81,9 +85,12 @@ mkfs(struct fs_device *dev, u_long blocks, u_long reserved)
 	}
 	if(block == sup.inode_bitmap)
 	    set_bit(TMP_BMAP_BLK, 0);
-	ERRNO = FS_WRITE_BLOCKS(dev, block, TMP_BMAP_BLK, 1);
-	if(ERRNO < 0)
+	result = FS_WRITE_BLOCKS(dev, block, TMP_BMAP_BLK, 1);
+	if(result < 0)
+	{
+	    ERRNO = -result;
 	    return FALSE;
+	}
 	block++;
     }
 
@@ -100,9 +107,12 @@ mkfs(struct fs_device *dev, u_long blocks, u_long reserved)
 	    TMP_INODE_BLK->inodes[0].nlinks = 2;
 	    TMP_INODE_BLK->inodes[0].data[0] = sup.data;
 	}
-	ERRNO = FS_WRITE_BLOCKS(dev, block, TMP_INODE_BLK, 1);
-	if(ERRNO < 0)
+	result = FS_WRITE_BLOCKS(dev, block, TMP_INODE_BLK, 1);
+	if(result < 0)
+	{
+	    ERRNO = -result;
 	    return FALSE;
+	}
 	if(block == sup.inodes)
 	    memset(TMP_INODE_BLK, 0, sizeof(struct inode));
 	block++;
@@ -116,9 +126,12 @@ mkfs(struct fs_device *dev, u_long blocks, u_long reserved)
     {
 	if(block == sup.data_bitmap)
 	    set_bit(TMP_BMAP_BLK, 0);
-	ERRNO = FS_WRITE_BLOCKS(dev, block, TMP_BMAP_BLK, 1);
-	if(ERRNO < 0)
+	result = FS_WRITE_BLOCKS(dev, block, TMP_BMAP_BLK, 1);
+	if(result < 0)
+	{
+	    ERRNO = -result;
 	    return FALSE;
+	}
 	if(block == sup.data_bitmap)
 	    clear_bit(TMP_BMAP_BLK, 0);
 	tmp -= FS_BLKSIZ * 8;
@@ -134,9 +147,12 @@ mkfs(struct fs_device *dev, u_long blocks, u_long reserved)
 	    set_bit(TMP_BMAP_BLK, tmp);
 	    tmp++;
 	}
-	ERRNO = FS_WRITE_BLOCKS(dev, block, TMP_BMAP_BLK, 1);
-	if(ERRNO < 0)
+	result = FS_WRITE_BLOCKS(dev, block, TMP_BMAP_BLK, 1);
+	if(result < 0)
+	{
+	    ERRNO = -result;
 	    return FALSE;
+	}
 	block++;
     }
 
@@ -147,20 +163,29 @@ mkfs(struct fs_device *dev, u_long blocks, u_long reserved)
     TMP_DIR_BLK->entries[0].inum = 0;
     strcpy(TMP_DIR_BLK->entries[1].name, "..");
     TMP_DIR_BLK->entries[1].inum = 0;
-    ERRNO = FS_WRITE_BLOCKS(dev, sup.data, TMP_DIR_BLK, 1);
-    if(ERRNO < 0)
+    result = FS_WRITE_BLOCKS(dev, sup.data, TMP_DIR_BLK, 1);
+    if(result < 0)
+    {
+	ERRNO = -result;
 	return FALSE;
-   
-    ERRNO = FS_READ_BLOCKS(dev, BOOT_BLK, TMP_BOOT_BLK, 1);
-    if(ERRNO < 0)
+    }
+
+    result = FS_READ_BLOCKS(dev, BOOT_BLK, TMP_BOOT_BLK, 1);
+    if(result < 0)
+    {
+	ERRNO = -result;
 	return FALSE;
+    }
     memcpy(&TMP_BOOT_BLK->sup, &sup, sizeof(sup));
     TMP_BOOT_BLK->magic = FS_BOOT_MAGIC;
     memcpy(&TMP_BOOT_BLK->boot_code, bootsect_code,
         sizeof(TMP_BOOT_BLK->boot_code)); 
-    ERRNO = FS_WRITE_BLOCKS(dev, BOOT_BLK, TMP_BOOT_BLK, 1);
-    if(ERRNO < 0)
+    result = FS_WRITE_BLOCKS(dev, BOOT_BLK, TMP_BOOT_BLK, 1);
+    if(result < 0)
+    {
+	ERRNO = -result;
 	return FALSE;
+    }
 
     return TRUE;
 }
