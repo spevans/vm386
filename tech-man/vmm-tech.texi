@@ -1,0 +1,219 @@
+\input texinfo  @c -*-Texinfo-*-
+@setfilename vmm-tech.info
+@settitle VMM Technical Manual
+@footnotestyle end
+@iftex
+@afourpaper
+@end iftex
+
+@syncodeindex vr fn
+
+@titlepage
+@title VMM Technical Manual
+@subtitle A virtual machine monitor for the Intel 80386
+@author S.P.S. Evans
+@author J.S. Harper
+@author C.J. Luke
+@end titlepage
+
+@ifinfo
+@node Top, Introduction, (dir), (dir)
+@top VMM Technical Manual
+
+@menu
+* Introduction::
+* Initialisation::
+* System Types::
+* Kernel::
+* Device Drivers::
+* Virtual Devices::
+* Filing System::
+* Shell::
+* Debugger::
+* System Log Daemon::
+* Printer Spooler::
+* Utility Functions::
+* Development Environment::
+
+* Bibliography::
+* Symbol Index::
+* Type Index::
+* Subject Index::
+@end menu
+@end ifinfo
+
+@node Introduction, Initialisation, Top, Top
+@chapter Introduction
+@cindex Introduction
+
+@include intro.texi
+
+@node Initialisation, System Types, Introduction, Top
+@chapter The Initialisation Process
+@cindex Initialisation
+@cindex Loader
+
+@include loader.texi
+
+@node System Types, Kernel, Initialisation, Top
+@chapter System Types
+@cindex System types
+@cindex Types, system
+
+@include types.texi
+
+@node Kernel, Device Drivers, System Types, Top
+@chapter The Kernel
+@cindex Kernel
+
+@include kernel.texi
+
+@node Device Drivers, Virtual Devices, Kernel, Top
+@chapter Device Drivers
+@cindex Device drivers
+
+@include devs.texi
+
+@node Virtual Devices, Filing System, Device Drivers, Top
+@chapter Virtual Devices
+@cindex Virtual devices
+@cindex Devices, virtual
+
+@include vdevs.texi
+
+@node Filing System, Shell, Virtual Devices, Top
+@chapter The Filing System
+@cindex Filing system
+
+@include fs.texi
+
+@node Shell, Debugger, Filing System, Top
+@chapter The Shell
+@cindex Shell
+
+@include shell.texi
+
+@node Debugger, System Log Daemon, Shell, Top
+@chapter The Debugger
+@cindex Debugger
+
+@include debug.texi
+
+@node System Log Daemon, Printer Spooler, Debugger, Top
+@chapter System Log Daemon
+@cindex Log daemon, system
+@cindex Syslogd
+
+@include syslogd.texi
+
+@node Printer Spooler, Utility Functions, System Log Daemon, Top
+@chapter Printer Spooler
+@cindex Printer spooler
+@cindex Spooler, printer
+
+@include spooler.texi
+
+@node Utility Functions, Development Environment, Printer Spooler, Top
+@chapter Utility Functions
+@cindex Utility functions
+@cindex Library functions
+
+@include utils.texi
+
+@node Development Environment, Bibliography, Utility Functions, Top
+@chapter Development Environment
+@cindex Development environment
+
+@include devel.texi
+
+@node Bibliography, Symbol Index, Development Environment, Top
+@chapter Bibliography
+@cindex Bibliography
+
+This chapter lists the sources of information which we have consulted
+whilst tackling this project.
+
+@itemize @bullet
+@item
+Intel Corporation, "80386 Programmer's Reference Manual", Santa Clara
+Calif.: Intel, 1986.
+
+@item
+Intel Corporation, "80386 System Software Writer's Guide", Santa Clara
+Calif.: Intel, 1986.
+
+@item
+Intel Corporation, "Intel486 Microprocessor Family Programmer's Reference Manual"
+, Santa Clara Calif.: Intel, 1992.
+
+@item
+Intel Corporation, "Intel Microprocessor Peripherals Data Book", Santa Clara
+Calif.: Intel 1986.
+
+@item
+NEC Corporation, "NEC Microprocessors and Peripherals Data Book Volume II",
+1993.
+
+@item
+J. Sanchez and M.P. Canton, "PC Programmer's Handbook", 2nd
+edition, McGraw-Hill, 1994.
+
+@item
+R. Wilton, "Programmer's Guide to PC & PS/2 Video System", Microsoft
+Press, 1987.
+
+@item
+L. Torvalds et.al., Linux operating system sources, 1995.
+
+@item
+D. Jurgens, "HelpPC 2.10 Quick Reference Utility", 1991.
+
+@item
+ANSI X3 Committee, "AT Attachment Interface for Disk Drives (Draft)",
+199x.
+
+@item
+H.M. Deitel, "Operating Systems", 2nd Edition, Addison-Wesley, 1990.
+
+@item
+A.M. Lister and R.D. Eager, "Fundamentals of Operating Systems", 4th
+Edition, Macmillan, 1988.
+
+@item
+J.L. Peterson and A. Silberschatz, "Operating System Concepts", 2nd 
+Edition, Addison-Wesley, 1985.
+
+@item
+H.M. Deitel and M.S. Kogan, "The Design of OS/2", Addison-Wesley, 1992.
+
+@item
+D. Bradley, "Implementing Direct Memory Access (DMA) in C", The C Users Journal,
+May 1992.
+
+@item
+K. Hazzah, "DMA Revealed", Windows / DOS Developer's Journal, April 1992.
+
+@item
+IBM Corporation, "OS/2 Version 2.0 Technical Compendium - Volume 1: Control Program", 1992.
+
+@item
+IBM Corporation, "OS/2 Version 2.0 Technical Compendium - Volume 2: Dos and Windows Environment", 1992.
+@end itemize
+
+@node Symbol Index, Type Index, Bibliography, Top
+@unnumbered Index of Functions, Macros and Variables
+
+@printindex fn
+
+@node Type Index, Subject Index, Symbol Index, Top
+@unnumbered Index of Data Types
+
+@printindex tp
+
+@node Subject Index, , Type Index, Top
+@unnumbered Subject Index
+
+@printindex cp
+
+@contents
+@bye

@@ -1,0 +1,215 @@
+
+The filing system provides a means of storing data on block devices.
+Files are organised in a tree-like structure through the use of
+@dfn{directories}. There is no limit on the number of files or
+directories that a directory can contain.
+
+@menu
+* FS Concepts::
+* File Names::
+* FS Devices::
+* FS Commands::
+@end menu
+
+@node FS Concepts, File Names, , Filing System
+@section Concepts
+@cindex Filing system, concepts
+
+This section explains some of the terms used by the filing system and
+a bit about how the filing system actually works.
+
+A @dfn{file} is an object in a filing system, files don't
+intrinsically have names, instead they are differentiated by
+@dfn{i-numbers}, each i-number representing a separate file. Each file
+has a number of attributes associated with it, these include its type
+and permission bits, the time at which it was last modified and the
+data (a sequence of characters) stored in the file.
+
+A @dfn{directory} is a file containing a list of name to i-number
+mappings, each mapping is called a directory entry and specifies one
+file stored in the directory. When a named file is referenced the
+@dfn{current directory} is scanned to find the i-number of the file.
+Each directory has two special entries, @file{.} pointing to the
+directory itself and @file{..} pointing at the directory's parent
+directory.
+
+It is possible for a file's i-number to be stored in more than one
+directory entry, this allows a file to have more than one name, each
+directory entry is sometimes called a @dfn{hard link} to the file.
+Hard links have their drawbacks (hard to manage, can't cross device
+boundaries), so the filing system provides another type of link:
+@dfn{symbolic links}. A symbolic link binds much less tightly than a
+hard link, only the name of the file being linked to (i.e. a directory
+entry pointing to that file) is stored with the link, not the i-number.
+
+@node File Names, FS Devices, FS Concepts, Filing System
+@section File Names
+@cindex File names
+@cindex Filing system, file names
+
+Each file (or directory) can be located through the use of a
+@dfn{file name}. Each file name tells the system how to locate the
+file it specifies by listing the directories that have to be
+traversed from the current directory and then the name of the
+actual file separated by @samp{/} characters.
+
+Other meta characters include @samp{:} to denote a device name (for
+example, the file name @samp{hda1:foo} denotes the file @samp{foo} on
+the device @samp{hda1}) or the root directory of the current device
+(for example @samp{:foo}, the file @samp{foo} in the root of the
+current device). Finally, a @samp{/} character at the start of a file
+name refers to the system's global root directory.
+
+The following table contains several example file names together with
+a description of how the filing system uses them to locate the file or
+directory that they specify.
+
+@table @file
+@item foo
+@itemx ./foo
+The file named @file{foo} in the current directory.
+
+@item foo/bar
+The file named @file{bar} in the directory called @file{bar} in the
+current directory.
+
+@item ../foo
+The file called @file{foo} in the parent of the current directory.
+
+@item /foo
+The file named @file{foo} in the system's root directory.
+
+@item hda:
+The root directory of the device called @file{hda} (the first IDE hard
+disk).
+
+@item hda:foo
+The file called @file{foo} in the root directory of the device called
+@file{hda}.
+
+@item :foo
+The file named @file{foo} in the root directory of the device which the
+current directory is stored on.
+@end table
+
+@node FS Devices, FS Commands, File Names, Filing System
+@section Devices
+@cindex Devices, filing system
+@cindex Filing system, devices
+
+A @dfn{device} is a contiguous set of disk blocks that the filing
+system may store data on. Before the filing system is any use a device
+must be initialised and added to the list of devices that the filing
+system may access. Once this has been done the device can be accessed
+and files and directories may be created on it.
+
+One of the most common entities to initialise as a filing system
+device is a hard disk partition; when the system is initialised the
+hard disk device driver scans the disks partition table and creates a
+logical partition for each partition it finds. For more details about
+hard disks see @ref{Hard Disk}.
+
+When referring to a device in the filing system, its name should have
+a colon (@samp{:}) appended to it. For example to refer to the first
+primary partition of the first IDE disk, use the device name
+@samp{hda1:}. The name of the device is still @samp{hda1}, the colon
+simply tells the filing system that a device is being referred to, not
+a file or a directory.
+
+To create a new empty file system on a device the @code{mkfs} command
+should be used.
+
+@deffn {Command} mkfs type partition-name [reserved-blocks]
+Creates a new filing system on the partition called
+@var{partition-name}. The parameter @var{type} defines which type of
+device the partition exists on, currently the only possible values are
+@code{-hd} to denote a hard disk partition and @code{-fd} to specify a
+floppy disk.
+
+If @var{reserved-blocks} is defined, it specifies the number of
+blocks which will be left unused, directly after the boot block.
+@end deffn
+
+An initialised device may be added to the list of devices available
+for access by using the @code{mount} command.
+
+@deffn {Command} mount type partition-name
+Adds the partition @var{partition-name} on the device of type @var{type}
+(currently, this may only be @code{-hd} or @code{-fd}) to the filing
+system.
+
+To allow the system to boot from a hard disk partition, any partition
+which has its system type set to 48 will be automatically mounted when
+the system is initialised.
+@end deffn
+
+@deffn {Command} umount device-name
+Remove the device called @var{device-name} (no colon should be given)
+from the filing system.
+@end deffn
+
+@deffn {Command} devinfo
+Lists all the devices currently mounted in the filing system, and some
+information about each device.
+@end deffn
+
+@node FS Commands, , FS Devices, Filing System
+@section Shell Commands
+@cindex Filing system, commands
+@cindex Command, filing system
+
+The filing system defines a number of shell commands, allowing the
+user to manipulate the contents of the individual devices.
+
+@deffn {Command} cp source-file dest-file
+Copies the file called @var{source-file} to the file called
+@var{dest-file}.
+@end deffn
+
+@deffn {Command} type files@dots{}
+Prints each of the files named in the list @var{files} to the tty.
+@end deffn
+
+@deffn {Command} ls [directory]
+Lists the contents of the directory called @var{directory}, or if this
+parameter is undefined the current directory.
+@end deffn
+
+@deffn {Command} cd directory
+Changes the current directory of the shell to the directory called
+@var{directory}.
+@end deffn
+
+@deffn {Command} ln [options] source dest
+Makes a link from the directory entry called @var{dest} to the object
+called @var{source}. Currently the only option is the @code{-s} flag,
+if given the link is a symbolic link, otherwise a hard link is created.
+@end deffn
+
+@deffn {Command} mkdir directory
+Creates a new directory called @var{directory}. Note that the parent of
+@var{directory} must already exist.
+@end deffn
+
+@deffn {Command} rm files@dots{}
+Deletes each of the files named by @var{files}. This command can not
+be used to delete directories, use @code{rmdir} instead.
+@end deffn
+
+@deffn {Command} rmdir directory
+Removes the directory called @var{directory}. Note that only
+@emph{empty} directories may be deleted (i.e. those whose only entries
+are @file{.} and @file{..}). An error is signalled if @var{directory}
+is not empty.
+@end deffn
+
+@deffn {Command} mv source-file dest-file
+Renames the file called @var{source-file} as @var{dest-file}. This
+command is not able to move files across devices.
+@end deffn
+
+@deffn {Command} bufstats
+Prints some statistics about the use of the buffer cache, basically
+how many cache hits have occurred against the number of actual buffer
+accesses.
+@end deffn

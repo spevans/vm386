@@ -1,0 +1,70 @@
+@dfn{DMA} (Direct Memory Access) is a hardware mechanism used
+primarily for transferring data from I/O devices, such as the
+Floppy drives, directly to an area of memory. In many respects
+this is faster and more efficient than a CPU transfer of the
+information. The kernel defines a simple method of facilitating
+DMA transfers.
+
+There are eight DMA channels in all, numbered from 0. The lower
+four are 8-bit channels, and the upper four are 16-bits. Channel
+number 4, however, is unavailable since it is used to link
+the two halves of the DMA system.
+
+There are other restrictions
+on the use of DMA in the PC, which are a limit in a single transfer
+of 64 kilobytes, and it must take place within the lower
+16 megabytes of the address space and not cross a 64 kilobyte
+boundary. The function @code{alloc_pages_64} is recommended for
+allocating memory which suits this specification.
+
+The structures documented in this section can be found in
+the header file @file{<vmm/dma.h>}.
+
+@deftypefn {kernel Function} bool alloc_dmachan (u_int @var{chan}, char *@var{name})
+Marks the specified channel as allocated, using the label @var{name}
+to indicate who by. @var{name} should usually be the name of the
+calling module. If the channel is already marked, it returns
+@code{FALSE}, otherwise @code{TRUE} is returned to indicate
+success.
+@end deftypefn
+
+@deftypefn {kernel Function} void dealloc_dmachan (u_int @var{chan})
+Marks the specified channel as not in use.
+@end deftypefn
+
+@tindex struct DmaBuf
+@example
+struct DmaBuf @{
+    /* Logical pointer to the memory area
+     * the DMA is targeted/sourced
+     * from
+     */
+    char *Buffer;
+
+    /* The page and offset of the buffer.
+     * (Page << 16) | Offset  is the
+     * _physical_ address of Buffer.
+     */
+    u_int8 Page;
+    u_int16 Offset;
+
+    /* Count of the number of bytes to be
+     * transferred. Note, this should be one
+     * less than the amount you want transferred.
+     */
+    u_int16 Len;
+
+    /* The DMA channel to operate on. */
+    u_int8 Chan;
+@};
+@end example
+
+@deftypefn {kernel Function} void setup_dma (struct DmaBuf *@var{DmaInfo}, u_int8 @var{Mode})
+Configures the DMA controller for the transfer specified in 
+@var{DmaInfo}, with the command @var{Mode}. @var{Mode} may be one of
+@code{DMA_READ} or @code{DMA_WRITE}, which programs the controller
+for that operation. One setup, the function returns immediately.
+It is the responsibility of the other device involved in the
+transfer to signal it's completion in the PC architecture.
+@end deftypefn
+

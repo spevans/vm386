@@ -1,0 +1,1635 @@
+
+This chapter documents the individual physical device drivers we have
+implemented. A @dfn{device driver} is a module to control one of the
+host system's external devices. Each device itself will @emph{only} be
+addressed by its driver, all other parts of the system will communicate
+with the device driver and not the driver itself.
+
+@menu
+* Block Devices::
+* Floppy Disk::
+* Hard Disk::
+* Ramdisk Device::
+* Video Drivers::
+* Keyboard Driver::
+* TTY Driver::
+@end menu
+
+@node Block Devices, Floppy Disk, , Device Drivers
+@section Generic Block Device Support
+@cindex Block devices
+@cindex Generic block devices
+@cindex Devices, block-oriented
+
+Many of the peripheral devices found in a PC are @dfn{block-oriented},
+this means that the data stored on the device can only be accessed in
+units of a @dfn{block} (a fixed-size group of bytes). For example, most
+hard and floppy disks store data in 512-byte blocks.
+
+To make the implementation of a device driver for a block device
+easier we have defined the structure which such a driver can take,
+together with generic code to implement the core parts of the driver.
+
+Since the driver must work in a multi-tasking environment where many
+tasks may want access to the device at the same time special care has
+to be taken; the generic device structure basically defines a list of
+requests that the device should process, the structure of each
+individual request block and several functions to manage the request
+list.
+
+The C header file containing this is called @file{<vmm/blkdev.h>}, it
+should be included by each block device driver implementation. It
+requires two preprocessor macros to be defined before it is included,
+these are:
+
+@vtable @code
+@item BLKDEV_TYPE
+This should be defined to the type of the device driver's private data
+structure used to contain a single device's state.
+
+@item BLKDEV_NAME
+This must be defined as a string naming the device driver.
+@end vtable
+
+The IDE device driver uses the following piece of code to define these
+macros and then include the header file:
+
+@example
+#define BLKDEV_TYPE ide_dev_t
+#define BLKDEV_NAME "ide"
+#include <vmm/blkdev.h>
+@end example
+
+The header file @file{blkdev.h} defines each request structure as the
+following:
+
+@tindex blkreq_t
+@example
+typedef struct @{
+    /* Link in the list of requests. */
+    list_node_t node;
+    /* Device to access */
+    BLKDEV_TYPE *dev;
+    /* Block being read/written */
+    char *buf;
+    /* Index of block being read/written */
+    u_long block;
+    /* Number of blocks to access */
+    int nblocks;
+    /* Device-specific command. */
+    int command;
+    /* := result of request, zero for success */
+    int result;
+    /* Times we tried to do this command */
+    char retries;
+    /* TRUE when request has finished */
+    bool completed;
+    /* Task locked on this request. */
+    struct semaphore sem;
+@} blkreq_t;
+@end example
+
+The @file{<vmm/blkdev.h>} header file also contains three functions
+which are used to manipulate the list of requests maintained by each
+device. Since each device driver is free to name the symbols it uses
+to implement the driver as it wishes these functions are defined as
+macros taking the names of these objects as arguments. Each device
+drivers typically has a single expansion of the macros defining the
+functions that it wishes to use at the start of its C code. These
+macros are documented in the following paragraphs.
+
+@defmac END_REQUEST_FUN current-req-var
+This macro defines the function called @code{end_request}. Its only
+argument is the name of this driver's variable storing the request
+currently being processes.
+@end defmac
+
+@defmac SYNC_REQUEST_FUN do-req-fun
+This macro defines the function called @code{sync_request}. Its
+parameter names the function used by this driver to add a new request
+to its queue and start processing this request if possible.
+
+For example, the IDE driver calls this macro once as:
+
+@example
+SYNC_REQUEST_FUN(do_request)
+@end example
+
+@noindent
+and later defines the function @code{do_request} something like:
+
+@example
+/* If no request is currently being processed and there's new
+   requests in the queue, process the first one. This can be
+   called from an interrupt or the normal kernel context. REQ
+   is either a request to try and process or NULL. It will get
+   added to the list of requests if necessary. */
+static void
+do_request(blkreq_t *req)
+@{
+    u_long flags;
+    save_flags(flags);
+    cli();
+    if(REQ-IN-PROGRESS)
+    @{
+        if(req != NULL)
+            APPEND-TO-REQ-LIST(req);
+        load_flags(flags);
+        return;
+    @}
+    if(req == NULL)
+        req = NEXT-REQUEST-FROM-QUEUE();
+    current_req = req;
+    load_flags(flags);
+    /* Process this request... */
+@end example
+
+@noindent
+Note the careful saving and restoring of the interrupt-enable flag.
+Since most device drivers are interrupt-driven (i.e. requests usually
+end when an interrupt signals that a transaction has completed) it is
+essential that all accesses to the driver's data structures are atomic.
+@end defmac
+
+@defmac ASYNC_REQUEST_FUN do-req-fun
+This macro defines the function @code{async_request}. It is very
+similar to the macro @code{SYNC_REQUEST_FUN}.
+@end defmac
+
+Once the necessary functions have been expanded by a single call to
+each of the corresponding macros, they can be used as normal. These
+function are documented in the following paragraphs.
+
+@deftypefun {static void} end_request (int @var{result})
+This function should be called when the current request has been
+completed (either successfully or unsuccessfully).  It sets the
+request's @code{result} field to @var{result}, its @code{completed}
+field to @code{TRUE} and calls @code{signal} (@pxref{Semaphores}) on
+the request's semaphore.
+
+Note that this function may be called from interrupt handlers and that
+it is usually necessary to call the driver's function to fire up the
+next request in the queue.
+@end deftypefun
+
+@deftypefun {static inline bool} sync_request (blkreq_t *@var{req})
+This function is used to synchronously execute a single request (the
+block request structure pointed to by @var{req}). After the request
+have been processed the function returns @code{TRUE} if it completed
+successfully, or @code{FALSE} otherwise.
+
+Note that tasks calling this function will be suspended while the
+request is executing.
+@end deftypefun
+
+@deftypefun {static inline void} async_request (blkreq_t *@var{req})
+This function is used to start a block request; the request @var{req}
+will be added to the end of the correct request queue.
+
+The only way to find out when the request has completed is by testing
+the value of the @code{completed} field of @var{req}. If the task
+wishes to be suspended until the request completes it can simply call
+the @code{wait} function (@pxref{Semaphores}) on the request's
+semaphore.
+@end deftypefun
+
+For examples of block device drivers based on the @file{<vmm/blkdev.h>}
+skeleton see the system source files @file{drivers/physical/hd/ide.c} and
+@file{drivers/physical/floppy/floppy.c}.
+
+@node Floppy Disk, Hard Disk, Block Devices, Device Drivers
+@section The Floppy Disk Driver
+@cindex Floppy disk
+@cindex Devices, floppy disk
+
+@include floppy.texi
+
+@node Hard Disk, Ramdisk Device, Floppy Disk, Device Drivers
+@section The Hard Disk Driver
+@cindex Hard disk
+@cindex Devices, hard disk
+
+The hard disk device driver allows the system (and especially, the
+filing system, @pxref{Filing System}) to talk to any hard disks
+connected to the host computer. This driver is split into two main
+parts:
+
+@enumerate
+@item
+Generic hard disk support. This part of the driver is concerned with
+the higher-level aspects of disks. For example, this part of the
+driver handles all interfacing between the filing system and the lower-
+level physical drivers. Also, disks are split into @dfn{partitions}
+for compatibility with other PC operating systems.
+
+@item
+Drivers for each supported type of hard disk interface; currently we
+have only implemented an IDE driver. If a SCSI driver is required this
+would be easy to install (even without recompiling the hard disk
+module).
+@end enumerate
+
+The hard disk driver is contained in the @samp{hd} module
+(@pxref{Modules}), all functions documented in this section of the
+manual are located in this module (see the header file
+@file{<vmm/hd.h>}).
+
+@menu
+* Generic Hard Disk Handling::
+* IDE Driver::
+@end menu
+
+@node Generic Hard Disk Handling, IDE Driver, , Hard Disk
+@subsection Generic Hard Disk Handling
+@cindex Generic hard disk handling
+@cindex Hard disks, generic
+
+This is a layer of code using the physical hard disk drivers to
+present a unified interface to any type of hard disk to the rest of
+our operating system. It defines two important data structures, hard
+disk devices and hard disk partitions.
+
+The device structure is the most fundamental; each low-level driver
+creates device structures for each disk that it detects and gives each
+device a special name (for example the IDE driver calls the first IDE
+disk @samp{hda} and the second @samp{hdb}) which it may be referred to
+by.
+
+After each hard disk device is registered with the generic hard disk
+layer (by the low-level driver) the disk is scanned for partitions
+(these are standard PC partitions, except that any number of extended
+primary partitions are allowed) and a partition structure created for
+each one found. These partitions are also named, their name is the
+concatenation of the name of the device which they occur on and a
+number. For IDE disks the four primary partitions are given the
+numbers one to four (i.e. @samp{hda1} @dots{} @samp{hda4}) and any
+extended partitions are numbered from five upwards.
+
+The actual data structures are defined as:
+
+@tindex hd_partition_t
+@tindex hd_dev_t
+@example
+#define PARTN_NAME_MAX 8
+typedef struct hd_partition @{
+    struct hd_partition *next;
+    /* The first logical block of this partition, relative to
+       the start of the disk. */
+    u_long start;
+    /* The number of blocks in the partition. */
+    u_long size;
+    /* The device which the partition occurs on. */
+    struct hd_dev *hd;
+    /* The name of the partition. */
+    char name[PARTN_NAME_MAX];
+@} hd_partition_t;
+
+typedef struct hd_dev @{
+    struct hd_dev *next;
+    /* The name of the device. */
+    const char *name;
+    /* The geometry of the disk. */
+    u_long heads, cylinders, sectors;
+    /* The number of blocks on the disk. */
+    u_long total_blocks;
+    /* A function to read a sequence of blocks from the
+       device, returning TRUE on success. */
+    bool (*read_blocks)(struct hd_dev *hd, void *buf, u_long block,
+                        int count);
+    /* A function to write a sequence of blocks to the
+       device, returning TRUE on success. */
+    bool (*write_blocks)(struct hd_dev *hd, void *buf, u_long block,
+                         int count);
+@} hd_dev_t;
+@end example
+
+@noindent
+Note that the hard disk module always treats blocks as being 512 bytes
+long; this is different to the filing system (which currently uses
+1024 bytes per blocks).
+
+As each physical disk driver initialises itself, and scans for any
+attached drives that it should control, it creates an @code{hd_dev_t}
+for each disk and calls the function @code{add_dev} to get the generic
+hard disk code to initialise its partitions.
+
+@deftypefn {hd Function} bool add_dev (hd_dev_t *@var{dev})
+This function adds @code{dev} to the list of hard disk devices and
+then scans the disk for partitions, creating a new partition structure
+for each one found. As it does this it prints a line of output to the
+console describing the partitions it finds.
+
+If any partitions have their ``system-type'' field set to the value 48
+the partition will be automatically mounted to the filing system (see
+the function @code{mount_partition}).
+
+As well as creating a partition structure for each partition
+recognised this function also creates one spanning the whole of the
+physical disk, using the same name as the name of @var{dev}.
+
+When this function succeeds it returns @code{TRUE}, otherwise
+@code{FALSE}.
+@end deftypefn
+
+All the other functions exported by this part of the hard disk module
+are used to manipulate partitions, since they are the usual way that
+the hard disk is accessed.
+
+@deftypefn {hd Function} {hd_partition_t *} find_partition (const char *@var{name})
+This function searches the system's list of partition structures for
+one whose name matches the string @var{name}. If such a partition is
+found a pointer to it is returned, otherwise a null pointer is
+returned.
+
+Note that this function introduces a large flaw into the system: it
+precludes the removal of partition structures from the system
+(removable hard disks?) since there is no guarantee that a partition
+structure is not being used. To solve this a reference-count field is
+needed in each partition structure and two functions to get and
+release a partition (adjusting its reference count as required).
+@end deftypefn
+
+@deftypefn {hd Function} bool read_blocks (hd_partition_t *@var{partn}, void *@var{buf}, u_long @var{block}, int @var{count})
+This function reads @var{count} blocks from the partition represented
+by the partition structure @var{partn}. The first block read is
+@var{block} and it is stored at the address @var{buf} in the kernel
+segment.
+
+If this function fails it returns @code{FALSE}, otherwise @code{TRUE}.
+@end deftypefn
+
+@deftypefn {hd Function} bool write_blocks (hd_partition_t *@var{partn}, void *@var{buf}, u_long @var{block}, int @var{count})
+This function writes @var{count} blocks from the partition represented
+by the partition structure @var{partn}. The first block written is
+@var{block} and its new contents are taken from the address @var{buf}
+in the kernel segment.
+
+If this function fails it returns @code{FALSE}, otherwise @code{TRUE}.
+@end deftypefn
+
+The following two functions provide a means of using hard disk
+partitions as devices in the filing system (@pxref{Filing System}).
+
+@deftypefn {hd Function} bool mount_partition (hd_partition_t *@var{partn}, bool @var{read-only})
+This function is used to add the partition @var{partn} to the filing
+system as one of its devices. The device's name will be the same as
+the name of @var{partn}.
+
+If the @var{read-only} parameter is not @var{FALSE} the partition will
+be added as a read-only file system.
+
+This function returns @code{TRUE} on success, @var{FALSE} otherwise.
+@end deftypefn
+
+@deftypefn {hd Function} bool mkfs_partition (hd_partition *@var{partn}, u_long @var{reserved})
+This function creates a new, empty, file system on the partition
+represented by @var{partn}.
+
+The parameter @var{reserved} defines the number of blocks to reserve
+at the start of the disk (starting at block number one). Note that
+these blocks are @emph{filing system blocks}, that is 1024-byte
+blocks, not the 512-byte blocks that the hard disk module deals in.
+
+Note that it is an error to attempt to mkfs a mounted partition.
+
+This function returns @code{TRUE} in case of success, @code{FALSE}
+otherwise.
+@end deftypefn
+
+@node IDE Driver, , Generic Hard Disk Handling, Hard Disk
+@subsection The IDE Driver
+@cindex IDE driver
+@cindex Hard disks, IDE driver
+@cindex Devices, IDE driver
+
+The IDE driver portion of the hard disk module is a low-level device
+driver providing an interface with the first IDE controller to the
+higher-level hard disk layer.
+
+It uses the standard structure defined by the header file
+@file{<vmm/blkdev.h>} (@pxref{Block Devices}) to implement a simple
+interrupt-driven IDE driver. It attempts to handle errors as sensibly
+as possible, recalibrating the individual drives and resetting the
+controller when it thinks it necessary.
+
+Tasks submitting IDE requests are put to the sleep for the duration of
+the request, thereby allowing other tasks to utilise the CPU while IDE
+I/O is in progress. This allows hard disk access to cause as little
+performance loss as possible to the system.
+
+When the driver initialises itself it probes for the disks which are
+connected to the IDE controller then uses the BIOS hard disk tables to
+provide the geometry of the disk. As each disk is recognised the
+function @code{add_dev} is used to add it to the generic hard disk
+layer's list of devices.
+
+@node Ramdisk Device, Video Drivers, Hard Disk, Device Drivers
+@section The Ramdisk Device
+@cindex Ramdisk device
+@cindex Devices, ramdisk
+
+@include ramdisk.texi
+
+@node Video Drivers, Keyboard Driver, Ramdisk Device, Device Drivers
+@section Video Drivers
+@cindex Video drivers
+@cindex Devices, video
+
+The video driver controls all direct access to the host computer's
+video hardware; it provides the ability for each task to have its own
+@emph{virtual} video adapter. The user is then able to switch between
+the virtual adaptors, displaying whichever they wish, by special
+hot-key combinations.
+
+Several types of virtual adaptor are already implemented (CGA and
+MDA); the video subsystem has been designed to allow other types of
+virtual display adaptor to be supported. Currently the video driver
+will only work with a VGA-compatible video card, although it would be
+feasible to change this if necessary (without having to recompile the
+video module).
+
+All existing video support is located in the @samp{video} module
+(@pxref{Modules}), and all functions documented in this part of the
+manual are found in this module unless otherwise stated.
+
+Note that normally the @samp{video} module is not used explicitly to
+create a new screen, this function is normally performed by the
+@samp{tty} module. @xref{TTY Driver}.
+
+@menu
+* Virtual Adaptors::
+* Video Modes::
+* Virtualisation Details::
+* New Video Types::
+* VGA Functions::
+@end menu
+
+@node Virtual Adaptors, Video Modes, , Video Drivers
+@subsection Using Virtual Adaptors
+@cindex Virtual adaptors
+@cindex Video drivers, virtual adaptors
+
+As already stated, tasks may create @dfn{virtual video adapters} to
+give themselves a way of producing screen output. Each of these
+virtual adaptors is represented by an instance of the following
+structure:
+
+@tindex struct video
+@example
+struct video @{
+    /* Points to a constant structure defining the type
+       of this adaptor. */
+    struct video_ops *ops;
+    /* The task which created this adaptor. */
+    struct task *task;
+    /* Data describing the state of the *physical* adaptor
+       when this virtual adaptor is in the foreground. */
+    struct vga_info vga;
+    /* Data describing the current video mode of this
+       adaptor. */
+    struct mode_info mi;
+    /* Defines the video mode, these numbers are the same as
+       used by the BIOS INT 0x10,0 function. */
+    u_char mode;
+    /* TRUE when this virtual adaptor is in the foreground. */
+    bool in_view;
+    /* Local data for each type of virtual adaptor. */
+    union @{
+	struct mda_data mda;
+	struct cga_data cga;
+	char padding[MAX_VIDEO_DATA];
+    @} data;
+@};
+@end example
+
+@noindent
+When a task wishes to create a new virtual display it simply allocates
+one of these structures somehow, then calls the function
+@code{init_video} with the video structure, a string naming the type
+of adaptor that it wishes be virtualised and some other arguments.
+
+@deftypefn {video Function} bool init_video (struct video *@var{new}, struct task *@var{task}, const char *@var{type}, u_long @var{flags})
+This function initialises the video structure @var{new} and creates
+the virtual adaptor that it will represent. The task @var{task} is
+designated as being the owner of the new adaptor (@pxref{Task Handling}).
+
+The string @var{type} names the type of adaptor to virtualise; by
+default the system only supports two options here: @samp{mda} and
+@samp{cga} for MDA and CGA virtualisations respectively. The
+@var{flags} parameter is passed to the initialisation function of the
+chosen video type and therefore is defined by the individual video
+types.
+
+The created virtual adaptor will @emph{not} be viewable; to switch to
+this display the function @code{switch_video} can be used.
+
+If this function fails (for example it can't find a way to virtualise
+an adaptor of type @var{type}) it will return @var{FALSE}, otherwise
+it returns @var{TRUE}.
+
+Note that since each virtual video adaptor is mapped into the task's
+user segment (where the adaptor's real video memory would be), each
+task may only own one virtual adaptor at any one time.
+@end deftypefn
+
+@deftypefn {video Function} void kill_video (struct video *@var{video})
+This function is used to deallocate any resources associated with the
+virtual video adaptor represented by the video structure @var{video}.
+
+Note that it is not a particularly good idea to call this function
+when the display being killed is still in the foreground (i.e. it's
+being displayed by the physical video adaptor). Nothing too
+catastrophic should happen, but it may not be pretty.
+@end deftypefn
+
+Only one virtual adaptor may be displayed at once (no windowing system
+as yet!), this adaptor is referred to as being in the
+@dfn{foreground} (the others are in the @dfn{background}
+surprisingly). The function @code{switch_video} is used to control
+which adaptor is being displayed at any one time.
+
+@deftypefn {video Function} void switch_video (struct video *@var{video})
+This function brings the virtual adaptor represented by the video
+structure @var{video} to the foreground if it's not already there.
+@end deftypefn
+
+@node Video Modes, Virtualisation Details, Virtual Adaptors, Video Drivers
+@subsection Video Modes
+@cindex Video modes
+@cindex Video drivers, modes
+
+Many types of video adaptor provide more than one possible display
+mode (i.e. different resolutions, numbers of colours, text or graphics,
+etc@dots{}). Obviously the virtual video adaptors must also provide
+all of these modes to be as compatible as possible with the actual
+adaptor specifications.
+
+Each virtual adaptor structure (@pxref{Virtual Adaptors}) contains an
+instance of the following structure called @code{mi}, describing the
+adaptor's current video mode:
+
+@tindex struct mode_info
+@example
+struct mode_info @{
+    /* The dimensions of the display. In text modes this
+       is in characters, otherwise in pixels. */
+    short cols, rows;
+    /* A pointer to the start of the video buffer. Note that
+       this buffer is in the *user* segment of the task
+       owning this adaptor. */
+    char *buffer;
+    /* The number of bytes in each page of the buffer. */
+    size_t page_size;
+    /* The maximum number of pages that the adaptor can
+       contain. */
+    u_char pages;
+    /* TRUE if this is a text-based mode, FALSE for
+       a graphical mode. */
+    bool text_mode;
+    /* TRUE if this mode supports colour. */
+    bool colour;
+@};
+@end example
+
+Each video structure also contains a field @code{mode}; this is an
+integer corresponding to the BIOS mode that the adaptor is in.
+Although virtual machines running in a virtual adaptor are likely to
+use programmed I/O to change video modes (@pxref{Virtualisation Details})
+the function @code{set_mode} can be used to achieve the same effect
+with less overhead (this is how the virtual BIOS changes video modes).
+
+@deftypefn {video Function} bool set_mode (struct video *@var{video}, u_int @var{mode})
+This function changes the video mode being emulated by the virtual
+adaptor represented by @var{video} to the BIOS mode defined by the
+integer @var{mode}.
+
+If the operation fails --- usually because the type of device that
+@var{video} is emulating doesn't support the specified mode --- the
+function returns @code{FALSE}. Otherwise, if everything succeeds, the
+value @code{TRUE} is returned.
+@end deftypefn
+
+@node Virtualisation Details, New Video Types, Video Modes, Video Drivers
+@subsection Virtualisation Details
+@cindex Video virtualisation details
+
+As has been alluded to in the previous sections, virtual video
+adaptors are mainly intended for running virtual machines in. They are
+also used to great effect by the system's command-shell but this is
+accomplished through the TTY interface (@pxref{TTY Driver}). In
+general they concern themselves with providing as compatible a replica
+as possible of the actual video systems found in a PC, because of this
+very little time has been spent on providing easy methods of accessing
+the virtual displays from the kernel level.
+
+There are two aspects to each of the virtualisation implementations:
+
+@enumerate
+@item
+Video buffer virtualisation. Since displays can be put in the
+background each has its own piece of memory the same size as its video
+buffer. When the display is in the background this memory is mapped
+into the task's address space where the adaptor's video buffer would
+normally be; this allows tasks to continue to access their ``video
+memory'' even when they are in the background.
+
+The one display which is in the foreground has the host system's
+physical video buffer mapped into its task's address space, allowing
+that access to the virtual adaptors video buffer to go straight to the
+physical video buffer.
+
+When the foreground display is changed (see the function
+@code{switch_video}) the old foreground display has the contents of
+the system's physical video buffer copied to its local buffer and that
+buffer mapped to its task's video memory's address. The new foreground
+display then has the contents of its local buffer copied to the true
+video buffer and that mapped into the task's address space.
+
+@item
+I/O port virtualisation. All the usual PC video cards are controlled
+by accessing registers on the card through standard I/O ports. Using
+the standard method of virtualising I/O ports (@pxref{Virtual I/O Ports})
+the video driver traps all access by virtual machines of the I/O ports
+in the ranges 0x3b0 to 0x3bb (the MDA registers) and 0x3c0 to 0x3df
+(VGA and CGA) registers.
+
+Each type of virtual adaptor is responsible for handling, as best as it
+can, each reference to a port in these ranges; ignoring those which
+don't concern it (for example the MDA virtualisation only handles the
+ports in the 0x3b0 to 0x3bb range).
+@end enumerate
+
+Code running at the kernel level does not have any of I/O operations
+emulated automatically, since it is often necessary to access the
+virtualised video ports from the kernel the video module provides two
+functions @code{inb} and @code{outb} to do this.
+
+@deftypefn {video Function} u_char inb (struct video *@var{video}, u_short @var{port})
+This function emulates an @code{IN} instruction from the video adaptor
+port number @var{port} from the virtual display represented by
+@var{video}. The value returned is the result of this operation.
+@end deftypefn
+
+@deftypefn {video Function} void outb (struct video *@var{video}, u_char @var{value}, u_short @var{port})
+This function emulates an @code{OUT} instruction to the video adaptor
+I/O port numbered @var{port} for the virtual display @var{video}. The
+byte sent to this port is @var{value}.
+@end deftypefn
+
+Currently we have only virtualised two types of video adaptor:
+
+@table @asis
+@item MDA
+The most straightforward of all PC video cards, the MDA card can only
+support one mode: 80x25 monochrome text.
+
+@item CGA
+The CGA card support several modes, including various text modes
+(colour or monochrome and 80x25 or 40x25) as well as two crude
+graphical modes, 320x200 with 16 colours and 640x200 monochrome.
+@end table
+
+@node New Video Types, VGA Functions, Virtualisation Details, Video Drivers
+@subsection Implementing New Video Types
+@cindex New video types
+@cindex Video drivers, implementing
+
+The video driver subsystem is not limited to emulating the MDA or CGA
+video cards, it would be reasonably straightforward to provide an
+emulation of any other type of card. In fact, this can be achieved
+without even recompiling the video module: simply create a new module
+for the new emulation and then use the functions and data types
+described in this section to register it with the video driver. If a
+virtual display is initialised with a type matching that of your
+emulation then it will be used automatically.
+
+Each type of video card being virtualised is represented by a single
+instance of the following structure:
+
+@tindex struct video_ops
+@example
+struct video_ops @{
+    struct video_ops *next;
+
+    /* The name of this virtualisation, this is compared
+       with the type string passed to the function `init_video'. */
+    const char *name;
+
+    /* The following function vectors are used to perform
+       most manipulation of the video structures of this
+       type. */
+    bool (*init)(struct video *v, u_long flags);
+    u_char (*inb)(struct video *v, u_short port);
+    void (*outb)(struct video *v, u_char byte, u_short port);
+    void (*switch_to)(struct video *v);
+    void (*switch_from)(struct video *v);
+    void (*kill)(struct video *v);
+    char *(*find_page)(struct video *v, u_int page);
+    bool (*set_mode)(struct video *v, u_int mode);
+
+    /* This function will be called when the video module
+       expunges itself from the system. */
+    void (*expunge)(void);
+@};
+@end example
+
+To register a new video mode emulation with the video driver simply
+fill in an instance of this structure (the @code{next} field is used
+as a link in a list of modes, it shouldn't be touched) then call the
+video module function @code{add_video}.
+
+@deftypefn {video Function} void add_video (struct video_ops *@var{new})
+This function adds the new video type structure @var{new} to the list
+of video types maintained by the video module.
+
+After calling this function any calls to @code{init_video} with a
+@var{type} parameter matching the @code{name} field of @var{new} use
+@var{new} as their video emulator.
+@end deftypefn
+
+Normally each type of virtualised video card will need to store
+per-display values, this can be accomplished through the use of the
+@code{data} field of the @code{struct video} (@pxref{Virtual Adaptors}).
+This area of the video structure will always contain at least 128
+bytes which may be used in any way the video emulation desires.
+Normally a structure of the values to be stored will be defined and a
+pointer to the @code{data} field, cast to the type of the structure.
+There is actually a predefined macro to do this for you:
+
+@defmac VIDEO_DATA (video, type)
+This macro expands to a pointer to the @code{data} field of the video
+structure @var{video} cast to the data type @var{type}.
+
+For example:
+
+@example
+VIDEO_DATA (v, struct foo *)
+  @expansion{} ((struct foo *)(&(v)->data))
+@end example
+@end defmac
+
+Note that the following function descriptions actually refer to the
+functions in the @code{struct video_ops} type, @emph{not} to functions
+in the video module. The @var{v} parameter that each of these
+functions gets is the virtual display to operate on, obviously a
+particular emulation type's functions are only called when the virtual
+display is of that type.
+
+@deftypefn {video_ops Function} bool init (struct video *@var{v}, u_long @var{flags})
+This function is called when the video structure @var{v} is
+initialised to a display of this type. @var{flags} is the parameter of
+the same name passed to the @code{init_video} function.
+
+Note that the only values needing to be initialised in @var{v} are
+those stored in the @code{data} field, all others are initialised by
+@code{init_video}. This function should also initialise the page table
+entries mapping the display's virtual video buffer.
+
+When this function succeeds it should return @code{TRUE}, otherwise
+@code{FALSE}.
+@end deftypefn
+
+@deftypefn {video_ops Function} u_char inb (struct video *@var{v}, u_short @var{port})
+This function is responsible for handling @code{IN} instructions from
+the virtual video adaptor @var{v}. It should return the result of
+reading the I/O port numbered @var{port}.
+@end deftypefn
+
+@deftypefn {video_ops Function} void outb (struct video *@var{v}, u_char @var{value}, u_short @var{port})
+This function handles @code{OUT} instructions to @var{v}. It should
+emulate writing the value @var{value} to the I/O port numbered
+@var{port}.
+@end deftypefn
+
+@deftypefn {video_ops Function} void switch_to (struct video *@var{v})
+This function is called when a video structure of this type is brought
+into the foreground. Generally this function only has to map the
+system's physical video memory into the address space of the task
+owning @var{v} (together with the necessary copying of the current
+video buffer contents).
+
+Note that the VGA registers for this display are reloaded
+automatically (@pxref{VGA Functions}).
+@end deftypefn
+
+@deftypefn {video_ops Function} void switch_from (struct video *@var{v})
+This function is called when the virtual display represented by @var{v}
+is moved from the foreground to the background and @var{v} is of the
+type maintained by this set of emulation functions. This usually has
+to map the display's virtual video buffer back into the task's address
+space.
+
+Note that the video module does @emph{not} automatically save the VGA
+registers each time a display goes into the background.
+@end deftypefn
+
+@deftypefn {video_ops Function} void kill (struct video (@var{v})
+This function is called when @var{v} is destroyed, it provides a
+chance to deallocate any local resources which the display is using
+(for example memory pages).
+@end deftypefn
+
+@deftypefn {video_ops Function} {char *} find_page (struct video *@var{v}, u_int @var{page})
+This function should return a pointer (valid in the @emph{kernel}
+segment) to the display page number @var{page} of the virtual display
+represented by @var{v}. If such a page does not exist a null pointer
+should be returned.
+@end deftypefn
+
+@deftypefn {video_ops Function} bool set_mode (struct video *@var{v}, u_int @var{mode})
+This function is used to change the video mode of @var{v} to the BIOS
+mode @var{mode}. Generally this just checks that the type of adaptor
+being virtualised supports the mode then calls @code{vga_set_mode} if
+it does.
+
+When this function is successful in changing the mode it should return
+@code{TRUE}, otherwise @code{FALSE}.
+@end deftypefn
+
+@node VGA Functions, , New Video Types, Video Drivers
+@subsection The VGA Functions
+@cindex VGA functions
+@cindex Video drivers, VGA functions
+
+To aid in the implementation of video adaptor emulations the video
+subsystem provides a number of functions to manipulate the system's
+VGA hardware. Most importantly they allow the storing and subsequent
+reloading of the complete set of VGA control registers. This makes
+switching virtual displays very easy; simply reload the new display's
+register set (and setup the video buffer, but that doesn't concern us
+here).
+
+The header file @file{<vmm/vga.h>} defines the VGA registers and the
+structure used by these functions, it stores all the VGA registers as
+well as some other information:
+
+@example
+struct vga_info @{
+    /* An image of the VGA control registers. The actual format
+       of this array is defined in the header file, it's
+       something like:
+
+         24 CRT controller registers
+         21 Attribute controller registers
+         9  Graphics controller registers
+         5  Sequencer registers
+         1  Miscellaneous control register */
+    u_char regs[VGA_TOTAL_REGS];
+
+    /* These define the I/O ports used to access the CRT index
+       and data ports (either 3b4/3b5 or 3d4/3d5). */
+    u_short crt_i, crt_d;
+
+    /* The I/O port used to access the Input Status Register 1,
+       either 3ba or 3da. */
+    u_short is1_r;
+@};
+@end example
+
+Each video structure (@pxref{Virtual Adaptors}) contain an instance of
+this structure as their @code{vga} field. This holds the VGA
+information for each virtual display, and is loaded automatically each
+time the foreground display is switched.
+
+@deftypefn {video Function} void vga_save_regs (struct vga_info *@var{vga})
+This function stores the current values of the VGA control registers
+into the structure pointed to by @var{vga}.
+
+Note that this function leaves bit 5 of the Attribute controller
+address register unset; this means that the display is disabled.
+@end deftypefn
+
+@deftypefn {video Function} void vga_load_regs (struct vga_info *@var{vga})
+This function loads the VGA control register values stored in the
+structure pointed to by @var{vga} into the VGA hardware.
+
+Note that this function leaves bit 5 of the Attribute controller
+address register unset; this means that the display is disabled.
+@end deftypefn
+
+@deftypefn {video Function} void vga_enable_video (struct vga_info *@var{vga})
+This function enables the video hardware by setting bit 5 of the
+Attribute controller address register.
+
+The @var{vga} parameter is only used to get the I/O address of the
+Input Status 1 register.
+@end deftypefn
+
+@deftypefn {video Function} void vga_disable_video (struct vga_info *@var{vga})
+This function disables the video hardware by clearing bit 5 of the
+Attribute controller address register.
+
+The @var{vga} parameter is only used to get the I/O address of the
+Input Status 1 register.
+@end deftypefn
+
+As well as manipulating the VGA registers the video module also stores
+instances of the above structure for many of the standard BIOS video
+modes. When it is necessary to switch the video mode that a display
+uses it is therefore possible to get a copy of the register values to
+put the physical display into that mode.
+
+@deftypefn {video Function} bool vga_get_mode (u_int @var{mode}, const char **@var{regsp}, const struct mode_info **@var{infop})
+This function attempts to find a set of VGA registers and a
+@code{mode_info} structure for the standard BIOS video mode number
+@var{mode}. If it can find such a mode the two pointers @var{regsp}
+and @var{infop} have the location of these structures stored in the
+address that they point to, and the function returns @code{TRUE}.
+Otherwise, the function returns @code{FALSE}.
+
+For example:
+
+@example
+const struct vga_info *vga;
+const struct mode_info *mi;
+if(video->vga_get_mode(3, &vga, &mi))
+@{
+    /* Use the information... */
+@end example
+@end deftypefn
+
+@deftypefn {video Function} bool vga_set_mode (struct video *@var{video}, u_int @var{mode})
+This function attempts to change the video mode used by the virtual
+display @var{video} to the standard BIOS video mode number @var{mode}.
+
+If it succeeds it returns @code{TRUE}, else @code{FALSE} is returned.
+@end deftypefn
+
+@node Keyboard Driver, TTY Driver, Video Drivers, Device Drivers
+@section Keyboard Driver
+@cindex Keyboard driver
+@cindex Devices, keyboard driver
+
+The keyboard device driver handles all low-level interfacing with the
+keyboard and its controller, it supports multiple @dfn{logical keyboards},
+allowing the system to control where the keys typed at the keyboard are
+actually sent.
+
+Several types of logical keyboards are provided, @dfn{raw keyboards}
+simply transmit each scan code as it is received while
+@dfn{cooked keyboards} translate scan codes into ASCII strings. A
+separate part of the system implements @dfn{virtual keyboards} which
+emulate the keyboard hardware for a virtual machine
+(@pxref{Virtual Keyboard}).
+
+All functions described in this section of the manual are members of
+the @samp{kbd} module (@pxref{Modules}), the header file describing
+this device driver is @file{<vmm/kbd.h>}.
+
+@menu
+* Keyboard Overview::
+* Raw Keyboards::
+* Cooked Keyboards::
+@end menu
+
+@node Keyboard Overview, Raw Keyboards, , Keyboard Driver
+@subsection Keyboard Overview
+@cindex Keyboard driver, overview
+
+The heart of the keyboard driver is its IRQ handler, this is the
+function which is called each time a scan code is available in the
+keyboard buffer. Since the keyboard IRQ does not have to be serviced
+that quickly the handler is implemented as a queued IRQ handler ---
+this relaxes the large restrictions that IRQ handlers normally face
+(@pxref{Interrupt Handlers}).
+
+When the IRQ handler receives a scan code it attempts to convert it to
+a @dfn{key code}, this is an eight-bit value defining the key which
+was just pressed or released (sometimes more than one scan code is
+received for a single event, key codes simplify our handling of these
+events). The mapping between key codes and the keys on the keyboard is
+defined by the header file @file{<vmm/keycodes.h>}; where a single
+scan code is sent for an event its key code is the same as the scan
+code, where more than one scan code is sent for a single event an
+arbitrary key code value has been chosen.
+
+Once a key code has been computed for the received scan code the next
+thing the IRQ handler does is to check it against each of the special
+system hot-keys, these include @kbd{Alt-SysReq}, @kbd{Alt-@key{ESC}},
+@kbd{Ctrl-Alt-@key{DEL}}, @kbd{Alt-KpPlus} and @kbd{Alt-KpMinus}. The
+action that these keys have is described in another part of this
+manual. If the key code doesn't match one of these hot keys the IRQ
+handler then checks if it is one of the various `shift' keys (i.e.
+@key{Shift}, @key{Alt}, @key{Ctrl}, @dots{}), if so the current shift
+state (a value coding which shift keys are currently held down) is
+altered accordingly and the handler exits. Note that the `lock' keys
+are not recognised by the IRQ handler.
+
+If the key code is not a hot-key and not a shift-key the IRQ handler
+simply finds the logical keyboard which currently has the keyboard
+focus and calls its @code{use_key} function with the key code and
+whether or not it was pressed or released. It is then up to the
+logical keyboard driver to do what it wants with the key code.
+
+@node Raw Keyboards, Cooked Keyboards, Keyboard Overview, Keyboard Driver
+@subsection Raw Keyboards
+@cindex Raw keyboards
+@cindex Keyboard driver, raw keyboards
+@cindex Logical keyboards
+@cindex Keyboard driver, logical keyboards
+
+The keyboard driver allows multiple logical keyboards to exist at
+once, at any moment one of these keyboards has the
+@dfn{keyboard focus}, that is, only it will receive the key codes
+typed at the keyboard. Each logical keyboard is represented by an
+instance of the following structure:
+
+@tindex struct kbd
+@example
+struct kbd @{
+    /* This function is called each time a key code is
+       typed and KBD is in focus. */
+    void (*use_key)(struct kbd *kbd, int shift_state,
+                    u_char key_code, u_char up_code);
+
+    /* Called when the keyboard focus is taken from KBD. */
+    void (*switch_from)(struct kbd *kbd, int shift_state);
+
+    /* Called when KBD is given the keyboard focus. Normally
+       it has to set the keyboard leds to reflect it's current
+       lock state. */
+    void (*switch_to)(struct kbd *kbd, int shift_state);
+
+    /* TRUE when this keyboard is in focus. */
+    bool in_focus;
+@};
+@end example
+
+@noindent
+As you can see it is basically just a set of three functions which get
+called when the keyboard driver needs to. To initialise one of these
+use the function @code{init_kbd},
+
+@deftypefn {kbd Function} void init_kbd (struct kbd *@var{kbd})
+This function initialises the logical keyboard structure @var{kbd} so
+that each function vector is undefined and the keyboard is out of
+focus.
+
+Although it seems as though this function is pointless it should still
+be called to initialise @emph{every} logical keyboard which is used.
+@end deftypefn
+
+After being initialised by @code{init_kbd} the function vectors should
+be set to point at suitable functions. The following three function
+descriptions document what these functions are supposed to do and how
+they are called:
+
+@deftypefun void use_key (struct kbd *@var{kbd}, int @var{shift_state}, u_char @var{key_code}, u_char @var{up_code})
+This function is called whenever a key code is received from the
+keyboard hardware and the logical keyboard @var{kbd} is in focus. The
+actual key code is defined by the @var{key_code} parameter, if it was
+pressed @var{up_code} will be zero, otherwise it was released.
+
+The @var{shift_state} parameter is a bit mask defining which of the
+various shift keys are currently held down, the following bit-values
+are defined in @file{<vmm/kbd.h>}:
+
+@vtable @code
+@item S_LEFT_SHIFT
+The left shift key.
+
+@item S_RIGHT_SHIFT
+The right shift key.
+
+@item S_SHIFT
+Either of the shift keys.
+
+@item S_LEFT_CTRL
+The left control key.
+
+@item S_RIGHT_CTRL
+The right control key.
+
+@item S_CTRL
+Either of the control keys.
+
+@item S_LEFT_ALT
+The left alt key.
+
+@item S_RIGHT_ALT
+The right alt key.
+
+@item S_ALT
+Either of the alt keys.
+@end vtable
+
+Note that since this function is called by keyboard IRQ handler this
+function is always called in the context of the @samp{irq-dispatcher}
+task.
+
+Also note that this function should handle the lock keys if it wants
+to, the keyboard IRQ handler totally ignores them.
+@end deftypefun
+
+@deftypefun void switch_from (struct kbd *@var{kbd}, int @var{shift_state})
+This function is called when the keyboard focus is taken from the
+logical keyboard @var{kbd}. The parameter @var{shift_state} defines
+which of shift keys are currently held down.
+@end deftypefun
+
+@deftypefun void switch_to (struct kbd *@var{kbd}, int @var{shift_state})
+This function is called when the logical keyboard @var{kbd} receives
+the keyboard focus. The parameter @var{shift_state} defines which of
+shift keys are currently held down.
+@end deftypefun
+
+To switch the keyboard focus between logical keyboards the keyboard
+module provides the following function.
+
+@deftypefn {kbd Function} void switch_focus (struct kbd *@var{new})
+This function gives the keyboard focus to the logical keyboard
+represented by the structure @var{new}. This means that the
+@code{switch_from} function of the logical keyboard currently in-focus
+is called, then the @code{switch_to} function of @var{new} is called.
+@end deftypefn
+
+The keyboard driver also allows total control of the keyboard LEDs,
+via the following function.
+
+@deftypefn {kbd Function} bool set_leds (u_char led_state)
+@vindex KB_LED_SCROLL_LOCK
+@vindex KB_LED_NUM_LOCK
+@vindex KB_LED_CAPS_LOCK
+This function sets the keyboard LEDs to the state defined by the
+parameter @var{led_state}, a bit mask with a bit per LED. The bit
+values @code{KB_LED_SCROLL_LOCK}, @code{KB_LED_NUM_LOCK} and
+@code{KB_LED_CAPS_LOCK} are defined in the keyboard header file.
+
+If this function succeeds in setting the LEDs it returns @code{TRUE},
+otherwise @code{FALSE}.
+@end deftypefn
+
+@node Cooked Keyboards, , Raw Keyboards, Keyboard Driver
+@subsection Cooked Keyboards
+@cindex Keyboard driver, cooked keyboards
+
+As well as the `raw' logical keyboards described in the previous
+section the keyboard driver provides a more comfortable interface to
+the characters typed at the keyboard. Cooked keyboards are an extended
+type of logical keyboard, they use the @code{use_key} function in a
+logical keyboard to call a function to `cook' the key code into an
+ASCII string.
+
+The @code{struct cooked_kbd} is the structure used to represent each
+cooked keyboard, the fields which may be accessed by users are defined
+thus:
+
+@tindex struct cooked_kbd
+@example
+struct cooked_kbd @{
+    /* The logical keyboard we derive this structure from. */
+    struct kbd kbd;
+
+    /* The current state of the `lock' keys. */
+    int lock_state;
+
+    /* Private data follows... */
+@end example
+
+@noindent
+The @code{lock_state} field is a bit mask defining which of the lock
+keys are active, the bit values it may contain are:
+
+@vtable @code
+@item L_CAPS_LOCK
+The caps-lock key.
+
+@item L_NUM_LOCK
+The num-lock key.
+
+@item L_SCROLL_LOCK
+The scroll-lock key.
+@end vtable
+
+@noindent
+Note that these have the same values as their @code{KB_LED_}
+counterparts.
+
+@deftypefn {kbd Function} void init_cooked (struct cooked_kbd @var{kbd})
+This function initialises a new cooked keyboard, @var{kbd}.
+@end deftypefn
+
+There are two ways in which the owner of a cooked keyboard may receive
+the ASCII characters generated, either immediately through a function
+callback (much like the @code{use_key} idea of a raw keyboard), or
+alternatively they may call a function which suspends the task until
+keyboard input arrives, when they are made runnable and a character is
+returned.
+
+@deftypefn {kbd Function} void cooked_set_function (struct cooked_kbd *@var{kbd}, void (*@var{func})(u_char @var{c}))
+This function sets the cooked keyboard @var{kbd} to send all keyboard
+input to the function @var{func} as soon as it arrives. The parameter
+@var{func} is a function taking one argument, @var{c}, which is the
+ASCII character received.
+@end deftypefn
+
+@deftypefn {kbd Function} void cooked_set_task (struct cooked_kbd *@var{kbd})
+This function makes the cooked keyboard store all characters it
+receives in an internal buffer until the @var{cooked_read_char}
+function is called to pop one character out of the buffer.
+@end deftypefn
+
+@deftypefn {kbd Function} u_char cooked_read_char (struct cooked_kbd *@var{kbd})
+This function reads one character from the cooked keyboard @var{kbd}
+(which must have had the @var{cooked_set_task} function called on it)
+and returns it.
+
+If no characters are currently available from @var{kbd} the current
+task is suspended until the next character arrives.
+@end deftypefn
+
+The keyboard driver also provides a function to explicitly cook key
+codes, this may be useful in some cases.
+
+@deftypefn {kbd Function} {char *} cook_keycode (u_char @var{key_code}, int @var{shift_state}, int @var{lock_state})
+This function translates the key code @var{key_code} into an ASCII
+string which is returned. If the function is unable to make a
+translation a null pointer is returned.
+
+The parameters @var{shift_state} and @var{lock_state} define which
+shift and lock keys are currently active, they are defined in the
+usual way.
+
+Note that by default the keyboard driver uses a keymap suited to Great
+Britain. Also provided is a US keymap but one line of the file
+@file{drivers/physical/kbd/cooked.c} will need to be changed to
+include it instead of the GB keymap. Currently there is no way to
+dynamically load keymaps into the driver.
+@end deftypefn
+
+@node TTY Driver, , Keyboard Driver, Device Drivers
+@section TTY Driver
+@cindex TTY driver
+@cindex Devices, tty driver
+
+The tty device driver does not actually control any hardware device
+like most device drivers. Instead it provides a unified interface to
+the video and keyboard drivers, allowing tasks to open @dfn{ttys}
+(logical consoles). A tty is like a character terminal --- ASCII
+characters are received from the logical keyboard (@pxref{Keyboard Driver})
+and programs may output characters to the related virtual display
+(@pxref{Video Drivers}).
+
+At its simplest the tty driver can be seen as combining a cooked
+keyboard and a display (together with functions for character output)
+into a single entity --- a console.
+
+All functions and variables documented in this section of the manual
+are members of the @samp{tty} module, defined in the header file
+@file{<vmm/tty.h>}.
+
+@menu
+* Opening and Closing TTYs::
+* Foreground TTY::
+* TTY Output::
+* TTY Input::
+@end menu
+
+@node Opening and Closing TTYs, Foreground TTY, , TTY Driver
+@subsection Opening And Closing TTYs
+@cindex Opening and closing ttys
+@cindex TTY driver, opening and closing
+
+A tty may have one of three types of keyboard: raw, cooked or virtual.
+Normally a cooked keyboard will be chosen to allow ASCII characters to
+be received, although virtual machines will use virtual keyboards. The
+type of keyboard which a tty has is coded by the following enum:
+
+@tindex enum tty_kbd_type
+@example
+enum tty_kbd_type @{
+    Raw, Cooked, Virtual
+@};
+@end example
+
+@noindent
+Each tty is represented by an instance of the following structure:
+
+@tindex struct tty
+@example
+struct tty @{
+    list_node_t node;
+    struct task *owner;
+    enum tty_kbd_type kbd_type;
+    union @{
+        struct kbd raw;
+        struct cooked_kbd cooked;
+        struct vkbd virtual;
+    @} kbd;
+    /* Points to the `struct kbd' of whichever type
+       of keyboard is used. */
+    struct kbd *base_kbd;
+    struct video video;
+    /* The current display page. */
+    u_char current_page;
+    /* The current cursor position. */
+    short x, y;
+
+    /* The following two fields are used by the
+       readline() function to maintain the tty's
+       input history. */
+    list_t rl_history;
+    int rl_history_size;
+@};
+@end example
+
+@noindent
+Most of the fields are fairly self-explanatory; @emph{none} of them
+should be modified except by the tty module itself. These structures
+should not be declared statically, the function @code{open_tty}
+allocates a piece of memory for each tty opened.
+
+@deftypefn {tty Function} {struct tty *} open_tty (struct task *@var{owner}, enum tty_kbd_type @var{kbd}, const char *@var{video_type}, u_long @var{video_flags})
+This function allocates a new tty structure and initialises it
+according to the function parameters, then returns a pointer to the
+new structure.
+
+The parameter @var{task} defines the task which `owns' this tty, it
+does not have to be the current task. @var{kbd} defines the type of
+logical keyboard to use for this tty. @var{video_type} is a string
+naming one of the video virtualisations provided by the video module,
+@var{video_flags} is passed unchanged to the @var{init_video} function
+of the video module.
+
+All ttys are created in the foreground displaying their first page.
+
+If this function fails for some reason it will return a null pointer.
+@end deftypefn
+
+@deftypefn {tty Function} void close_tty (struct tty *@var{tty})
+This function releases all resources associated with the tty
+represented by @var{tty} then deallocates the tty structure itself.
+
+If @var{tty} is the foreground tty when it is killed the tty
+immediately below it will inherit the foreground.
+@end deftypefn
+
+@node Foreground TTY, TTY Output, Opening and Closing TTYs, TTY Driver
+@subsection The Foreground TTY
+@cindex Foreground tty
+@cindex TTY driver, foreground tty
+
+The @dfn{foreground tty} is the tty which is currently being display
+as well as having the keyboard focus. The tty driver maintains a list
+of all the ttys in the system with the foreground tty as the first
+element; the second element is the tty immediately under the
+foreground tty and so on down the list. As the foreground tty and the
+stacking order of the ttys changes the list of ttys is updated to
+reflect the changes.
+
+@deftypevr {tty Variable} {struct tty *} current_tty
+This member of the video module structure stores a pointer to the
+foreground tty.
+@end deftypevr
+
+@deftypefn {tty Function} void to_front (struct tty *@var{tty})
+This function brings the tty represented by @var{tty} to the
+foreground.
+@end deftypefn
+
+@deftypefn {tty Function} void next_tty (void)
+This function rotates the list of ttys (and hence the foreground tty)
+down through the list (i.e. the new foreground tty is the tty that was
+immediately under the foreground tty).
+@end deftypefn
+
+@deftypefn {tty Function} void prev_tty (void)
+This function does the opposite of the @code{next_tty} function, that
+is: bring the bottom-most tty to the foreground and push the rest down.
+@end deftypefn
+
+@node TTY Output, TTY Input, Foreground TTY, TTY Driver
+@subsection TTY Output
+@cindex TTY output
+@cindex TTY driver, output
+
+All functions which perform output to a tty follow a set of standard
+rules:
+
+@itemize @bullet
+@item
+All output starts at the cursor position.
+
+@item
+When the end of a line is reached, output continues at the start of
+the next line.
+
+@item
+When the end of the bottom line is reached the display is scrolled
+upwards one line, the bottom line is blanked and output continues at
+the start of the bottom line.
+
+@item
+When the output operation has completed the cursor is moved to the
+character after the one that was output last.
+
+@item
+The only special characters are:
+
+@table @samp
+@item \n
+NL: output continues at the start of the next line.
+
+@item \t
+TAB: spaces are inserted up to the next column which is a multiple of
+8.
+
+@item \007
+BEL: an audible beep is sounded and output continues.
+@end table
+@end itemize
+
+@deftypefn {tty Function} void set_cursor (struct tty *@var{tty}, short @var{x}, short @var{y})
+This function sets the cursor's position to be at column @var{x} and
+row @var{y} of the current display page in the tty represented by
+@var{tty}.
+@end deftypefn
+
+@deftypefn {tty Function} void read_cursor (struct tty *@var{tty})
+This function resets the tty's notion of its cursor position to the
+actual location of the cursor in the display.
+
+This function is only useful if tty output is being combined with
+access to the virtual display.
+@end deftypefn
+
+@deftypefn {tty Function} void printn (struct tty *@var{tty}, const u_char *@var{buf}, size_t @var{length})
+This is the function to output an ASCII string to the display of the
+tty represented by @var{tty}. All other tty character output functions
+call this function to accomplish their task.
+
+@var{buf} is a pointer to the string to print, exactly @var{length}
+characters from the string will be output.
+@end deftypefn
+
+@deftypefn {tty Function} void print (struct tty *@var{tty}, const u_char *@var{buf})
+This function prints the zero-terminated string @var{buf} to the tty
+@var{tty}.
+@end deftypefn
+
+@deftypefn {tty Function} void vprintf (struct tty *@var{tty}, const u_char *@var{fmt}, va_list @var{args})
+This function performs a standard formatted output
+(@pxref{Formatted Output}) to the tty @var{tty} using the format
+specification string @var{fmt} and the list of parameters @var{args}.
+@end deftypefn
+
+@deftypefn {tty Function} void printf (struct tty *@var{tty}, const u_char *@var{fmt}, ...)
+This function uses the @var{vprintf} function to do a formatted output
+to the tty @var{tty}.
+@end deftypefn
+
+@deftypefn {tty Function} void clear (struct tty *@var{tty})
+This function clears all of the display belonging to @var{tty} and
+sets its cursor position to the top-left corner.
+@end deftypefn
+
+@deftypefn {tty Function} void clear_chars (struct tty *@var{tty}, size_t @var{length})
+Clear the @var{length} number of characters following the cursor in
+the tty device @var{tty}. The cursor is left where it is.
+@end deftypefn
+
+@deftypefn {tty Function} void scroll_up (struct tty *@var{tty})
+This function scrolls the contents of the display belonging to
+@var{tty} up one line and then clears the exposed bottom line.
+@end deftypefn
+
+@deftypefn {tty Function} void set_page (struct tty *@var{tty}, u_int @var{pageno})
+This function sets the display page being used by @var{tty} to the one
+numbered @var{pageno}.
+@end deftypefn
+
+@deftypefn {tty Function} void beep (struct tty *@var{tty})
+This function sounds a bell for the tty @var{tty}.
+@end deftypefn
+
+@deftypefn {tty Function} void speaker_on (struct tty *@var{tty}, u_int @var{freq})
+Turn on the system's speaker, it will be set to oscillate at a
+frequency of @var{freq} hertz. The speaker is associated with the tty
+device @var{tty}, it will be brought to the foreground to show the
+user which console is beeping.
+@end deftypefn
+
+@deftypefn {tty Function} void speaker_off (struct tty *@var{tty})
+Disable the speaker, this should only be called after using the
+function @var{speaker_on} to enable it.
+@end deftypefn
+
+@node TTY Input, , TTY Output, TTY Driver
+@subsection TTY Input
+@cindex TTY input
+@cindex TTY driver, input
+
+When a tty has been created with a cooked keyboard as its input device
+the tty module provides a couple of functions to make reading input
+from the tty easier. If a tty does not use a cooked keyboard the
+functions described in this section will @emph{not} work.
+
+@deftypefn {tty Function} int get_char (struct tty *@var{tty})
+This function returns the next character available from the tty
+represented by @var{tty}. If no characters are in the buffer the
+current task is suspended until a character is received.
+
+If an error occurs the value -1 is returned.
+@end deftypefn
+
+@deftypefn {tty Function} {char *} readline (struct tty *@var{tty}, size_t *@var{lengthp})
+This function reads a single line of input from the tty device
+@var{tty}. A buffer to contain the typed characters is allocated using
+the kernel @code{malloc} function and a pointer to this buffer is
+returned, it contains characters typed followed by a zero terminator.
+The value at location @var{lengthp} is set to the number of characters
+actually entered. After using the contents of the buffer, the caller
+should use @code{free} to deallocate it.
+
+If an error occurs, or the user types an end-of-line character at the
+start of the line a null pointer is returned.
+
+Note that although a zero terminator is appended to the entered line
+it is possible that the line contains null characters in its body. Use
+the contents of the @var{lengthp} parameter to find the end of the
+line if this may be a problem.
+
+Simple line editing and history functionality is provided, in general
+these will be bound to the same keys as the equivalent functions in
+the Emacs editor. The following table lists the available commands,
+where the variable @var{arg} is mentioned it refers to the
+@dfn{prefix argument} entered by the metafied numeric keys.
+
+@table @kbd
+@item C-f
+@itemx @key{Right}
+Move forward @var{arg} characters.
+
+@item C-b
+@itemx @key{Left}
+Move backward @var{arg} characters.
+
+@item C-a
+Move to the beginning of the line.
+
+@item C-e
+Move to the end of the line.
+
+@item C-d
+Either delete the @var{arg} characters starting with the one under the
+cursor or if the cursor is at the end of the line accept the current
+contents of the buffer (an end-of-line character).
+
+@item @key{Backspace}
+Delete the @var{arg} characters preceding the cursor.
+
+@item @key{RET}
+Insert a newline character at the end of the line and accept the
+contents of the buffer.
+
+@item C-l
+Redisplay the buffer.
+
+@item C-@key{SPC}
+Set the value of the mark to the current cursor position.
+
+@item C-x C-x
+Exchange the cursor position with that of the mark.
+
+@item C-n
+@itemx @key{Down}
+Move forward @var{arg} lines in the history list.
+
+@item C-p
+@itemx @key{Up}
+Move back @var{arg} lines in the history list.
+
+@item M-<
+Display the first line in the history list.
+
+@item M->
+Display the last line in the history list.
+
+@item M-0
+@itemx M-1
+@itemx M-2
+@itemx M-3
+@itemx M-4
+@itemx M-5
+@itemx M-6
+@itemx M-7
+@itemx M-8
+@itemx M-9
+Append the number typed to the end of the (decimal) prefix argument
+for the following command. For example typing @kbd{M-1 M-0 C-f} moves
+the cursor ten characters forwards.
+
+@item M--
+(That's @kbd{Meta-minus}.) Negate the value of the prefix argument for
+the next command. For example typing @kbd{M-- M-4 C-f} moves
+@emph{backwards} four characters.
+@end table
+
+@noindent
+The notation @kbd{C-@var{x}} and @kbd{M-@var{x}} means the @var{x} key
+with the @key{Control} modifier and the @key{Meta} qualifier
+respectively. To generate a @kbd{M-@var{x}} event either type
+@kbd{Alt-@var{x}} or @kbd{@key{ESC} @var{x}}.
+
+@xref{Kernel Malloc}.
+@end deftypefn

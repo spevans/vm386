@@ -1,0 +1,3 @@
+#!/bin/sh
+
+pr -f -l68 `find $1 -type f -print | sort` >$2

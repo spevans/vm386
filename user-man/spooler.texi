@@ -1,0 +1,27 @@
+The printer spooler allows sharing of a single printer device by more than
+one process. The user can submit files to be printed along with files printed
+by other processes and access to the printer by virtual machines.
+
+The spooler defines the following commands.
+
+@deffn {Command} lpr files@dots{}
+This command adds the listed files to the printer spooler queue.
+
+It makes a copy of the file in the spooler directory and adds it
+to the spooler queue. It then reports the result of each file it
+attempts to spool.
+@end deffn
+
+@deffn {Command} lpq
+This command lists all the files currently in the spool queue with a job number
+for each file spooled. This number can be used in conjunction with the
+@code{lprm} command.
+@end deffn
+
+@deffn {Command} lprm job-numbers@dots{}
+This command removes the files from the printer spooler queue with the
+job numbers listed in the commands parameters before they are printed.
+It reports if the job was successfully dequeued or not.
+
+The job numbers can be obtained from the @code{lpq} command.
+@end deffn

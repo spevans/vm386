@@ -1,0 +1,97 @@
+The printer port allows the connection of a printer. Virtualisation of this
+device is made by trapping three ports. Because more than one printer port
+can exist on a standard PC, the ports are given as offsets to the base address
+to the printer ports. The standard printer port base addresses are
+0x278, 0x378 and 0x3BC.
+
+The ports virtualised by the @samp{vprinter} module are:
+
+@table @asis
+@item Offset 0
+Data Port. Data written to this port is sent to the printer.
+
+@item Offset 1
+Status Register. This gives the current status of the printer.
+
+@item Offset 2
+Control Register. This controls the operation of the printer.
+
+@end table 
+
+Virtualisation is made more complicated because a method has to be found to
+distinguish between the end of one file printed to the printer and the start
+of a new file. Also, programs can write either directly to the printer port or
+can use BIOS functions. The @samp{vprinter} module therefore tries to provide
+a reasonable emulation of the device, accepting that there will be limitations,
+rather than attempting to provide a perfect emulation.
+
+The @samp{vprinter} module also allows for emulation of some of the services
+provided by BIOS service INT 0x17.
+
+The @samp{vprinter} module provides the following functions:
+
+@deftypefn {vprinter Function} void printer_write_char (struct vm *@var{vm}, struct vm86_regs *@var{regs})
+This function allows for emulation of the BIOS service INT 0x17 function 0x00.
+It writes a character to the spool file associated with the given
+port of the virtual machine. If no spool file exists, it is opened. 
+
+@var{vm} is the virtual machine.
+
+@var{regs} is the register set of the virtual machine.
+
+The data is written to the spool file according to the register values as follows: 
+
+@table @code
+@item AL
+The character to print.
+
+@item DX
+The number of the printer port to print it to.
+@end table
+
+The @code{AH} register is set to the status of the printer port.
+
+This function does not return a value.
+@end deftypefn
+
+@deftypefn {vprinter Function} void printer_initialise (struct vm *@var{vm}, struct vm86_regs *@var{regs})
+This function allows for emulation of the BIOS service INT 0x17 function 0x01.
+It initialises the printer port, closing any previously opened spool file
+associated with this port, submitting it for printing and opens a new spool
+file.
+
+@var{vm} is the virtual machine.
+
+@var{regs} is the register set of the virtual machine.
+
+The port is initialised according to the register values as follows:
+
+@table @code
+@item DX
+The number of the printer port to initialise.
+@end table
+
+The @code{AH} register is set to the status of the printer port.
+
+This function does not return a value.
+@end deftypefn
+
+@deftypefn {vprinter Function} void printer_get_status (struct vm *@var{vm}, struct vm86_regs *@var{regs})
+This function allows for emulation of the BIOS service INT 0x17 function 0x02.
+It returns the status of the specified port.
+
+@var{vm} is the virtual machine.
+
+@var{regs} is the register set of the virtual machine.
+
+The port is specified according to the register values as follows:
+
+@table @code
+@item DX
+The number of the printer port to obtain the status of.
+@end table
+
+The @code{AH} register is set to the status of the printer port.
+
+This function does not return a value.
+@end deftypefn

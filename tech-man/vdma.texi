@@ -1,0 +1,51 @@
+The are two DMA chips in the PC. The first DMA chip is responsible for 8-bit
+transfers and occupies ports 0x00 - 0x0F. The second DMA chip is responsible
+for 16-bit transfers and occupies ports 0xC0 - 0xDF. Both chips also occupy
+the port range 0x80 - 0x90 where the page registers for both chips reside.
+
+The emulation of the DMA chipset is very simple. It allows for programs to
+read and write the values of the DMA registers. It is the responsibility of 
+other virtual devices to use the DMA information appropriately.
+
+The following functions allow virtual devices to use access the DMA chipset:
+
+@deftypefn {vdma Function} void get_dma_info (struct vm *@var{vm}, struct channel_info *@var{info})
+This function returns information about the settings of a DMA channel.
+
+@var{vm} is the virtual machine.
+
+@var{channel} is the DMA channel (0 - 7).
+
+@var{info} is the structure where the channel information is placed.
+
+This function returns nothing.
+@end deftypefn
+
+@deftypefn {vdma Function} void set_dma_info (struct vm *@var{vm}, struct channel_info *@var{info})
+This function sets information about the settings of a DMA channel.
+
+@var{vm} is the virtual machine.
+
+@var{channel} is the DMA channel (0 - 7).
+
+@var{info} is the structure where the channel information is obtained.
+
+This function returns nothing.
+@end deftypefn
+
+The header file @file{vdma.h} defines the channel information structure as
+follows:
+
+@tindex struct channel_info
+@example
+struct channel_info @{
+  /* Memory address page */
+  u_int8    page;
+  /* Memory offset */
+  u_int16   address;
+  /* Length of transfer */
+  u_int16   len;
+  /* Transfer Mode */
+  u_int8    mode;
+@};
+@end example 

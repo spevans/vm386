@@ -1,0 +1,255 @@
+
+Due to the nature of our project (an operating system) we are unable
+to use the standard library functions found in most C programming
+environments. Those functions which we wish to use have to be build
+into the system itself. This chapter describes the library functions
+we have included, as well as other useful features we have implemented.
+
+@menu
+* String Functions::
+* List Type::
+* I/O Functions::
+* Debug Output::
+@end menu
+
+@node String Functions, List Type, , Utility Functions
+@section String And Memory Functions
+@cindex String functions
+@cindex Memory functions
+
+Most of the standard C library functions for string and array
+manipulation have been implemented in one way or another:
+
+@itemize @bullet
+@item
+As inline functions defined in the header file @file{<vmm/string.h>},
+most of these functions are written in assembly language. Many were
+taken from straight the Linux operating system. The following
+functions are defined in this manner: @code{strcpy}, @code{strncpy},
+@code{strcat}, @code{strncat}, @code{strcmp}, @code{strncmp},
+@code{strchr}, @code{strrchr}, @code{strspn}, @code{strcspn},
+@code{strpbrk}, @code{strstr}, @code{strlen}, @code{stpcpy},
+@code{memcpy}, @code{memmove}, @code{memcmp}, @code{memchr},
+@code{memset}, @code{strcasecmp}.
+
+@item
+The functions @code{strtoul} and @code{strdup} are members of the kernel
+module. @xref{Kernel}.
+@end itemize
+
+@node List Type, I/O Functions, String Functions, Utility Functions
+@section Doubly Linked List Type
+@cindex Doubly linked lists
+@cindex Lists, doubly linked
+
+Several parts of the system need to use doubly linked lists; to
+save each one writing its own implementation (and possibly introducing
+bugs) we have created a generic doubly linked list implementation. The
+header file @file{<vmm/lists.h>} defines all data structure and
+functions. It is based on the list type in the Amiga's @code{Exec}
+kernel. Two data structures are used to represent lists and the nodes
+comprising each list:
+
+@example
+typedef struct __list @{
+    /* Points to the first node in the list. */
+    struct __list_node *head;
+
+    /* Always a null pointer. */
+    struct __list_node *tail;
+
+    /* Points to the last node in the list. */
+    struct __list_node *tailpred;
+@} list_t;
+
+typedef struct __list_node @{
+    /* Points to the next node. */
+    struct __list_node *succ;
+
+    /* Points to the previous node. */
+    struct __list_node *pred;
+@} list_node_t;
+@end example
+
+There is a subtle difference in the way this type of list is linked
+together to most other linked list implementations. Instead of the
+@code{succ} field in the last node and the @code{pred} field in the
+first node being null pointers, they @emph{point at} null pointers
+(actually they point at the @code{tail} field of the list header). This
+drastically reduces the number of cases that need to be considered by
+the functions which manipulate lists since they generally don't have to
+check for null pointers in nodes. The normal way of traversing a list is
+usually something like:
+
+@example
+list_node_t *nxt, *x = &a_list.head;
+while((nxt = x->succ) != NULL)
+@{
+    /* Use the node `x'. */
+    x = nxt;
+@}
+@end example
+
+To create a data structure that may be linked into a list it must have
+a @code{list_node_t} as its first field. Then in the list manipulation
+functions you can pass a pointer to the node of the structure as a
+parameter to these functions; when a function returns a pointer to a
+node it has to be cast to the correct type of the structure.
+
+All the functions manipulating lists are defined inline for speed and
+ease of use.
+
+@deftypefun {inline void} init_list (list_t *@var{list})
+Initialise the list @var{list} to be empty. This must be done before
+any nodes can be added to the list, forgetting to do this will usually
+result in a crash.
+@end deftypefun
+
+@deftypefun {inline void} append_node (list_t *@var{list}, list_node_t *@var{node})
+Append the node @var{node} to the end of the list @var{list}.
+@end deftypefun
+
+@deftypefun {inline void} prepend_node (list_t *@var{list}, list_node_t *@var{node})
+Insert the node @var{node} as the first element of the list @var{list}.
+@end deftypefun
+
+@deftypefun {inline void} insert_node (list_t *@var{list}, list_node_t *@var{node}, list_node_t *@var{pred})
+Insert the node @var{node} into the list @var{list} after the node
+@var{pred}.
+@end deftypefun
+
+@deftypefun {inline void} remove_node (list_node_t *@var{node})
+Remove the node @var{node} from the list that it is a member of. Note
+that if it is not linked into a list the results are undefined.
+@end deftypefun
+
+@deftypefun {inline bool} list_empty_p (list_t *@var{list})
+This predicate returns @code{TRUE} if the list @var{list} is empty,
+@code{FALSE} otherwise.
+@end deftypefun
+
+@node I/O Functions, Debug Output, List Type, Utility Functions
+@section I/O Functions
+@cindex I/O functions
+
+The header file @file{<vmm/io.h>} defines functions to access the
+80386's programmed I/O features (i.e. the instructions @code{IN},
+@code{OUT} and their variants).
+
+@deftypefun {inline u_char} inb (u_short @var{port})
+Read a byte from the I/O port @var{port}.
+@end deftypefun
+
+@deftypefun {inline u_short} inw (u_short @var{port})
+Read a word from the I/O port @var{port}.
+@end deftypefun
+
+@deftypefun {inline u_long} inl (u_short @var{port})
+Read a double word from the I/O port @var{port}.
+@end deftypefun
+
+@deftypefun {inline void} outb (u_char @var{val}, u_short @var{port})
+Output the byte @var{val} to the I/O port @var{port}.
+@end deftypefun
+
+@deftypefun {inline void} outw (u_short @var{val}, u_short @var{port})
+Output the word @var{val} to the I/O port @var{port}.
+@end deftypefun
+
+@deftypefun {inline void} outl (u_long @var{val}, u_short @var{port})
+Output the double word @var{val} to the I/O port @var{port}.
+@end deftypefun
+
+@findex inb_p
+@findex inw_p
+@findex inl_p
+@findex outb_p
+@findex outw_p
+@findex outl_p
+Sometimes it is necessary to pause for a short interval after an I/O
+instruction, each of the previous function is accompanied by a
+function whose name ends in @samp{_p} which does the normal operation
+then pauses. These functions are called @code{inb_p}, @code{inw_p},
+@code{inl_p}, @code{outb_p}, @code{outw_p}, @code{outl_p}.
+
+The string I/O functions are also supported:
+
+@deftypefun {inline void} insb (void *@var{ptr}, int @var{count}, u_short @var{port})
+Read @code{count} bytes from the port @var{port} into the buffer
+pointed to by @var{ptr}.
+@end deftypefun
+
+@deftypefun {inline void} insw (void *@var{ptr}, int @var{count}, u_short @var{port})
+Read @code{count} words from the port @var{port} into the buffer
+pointed to by @var{ptr}.
+@end deftypefun
+
+@deftypefun {inline void} insl (void *@var{ptr}, int @var{count}, u_short @var{port})
+Read @code{count} double words from the port @var{port} into the
+buffer pointed to by @var{ptr}.
+@end deftypefun
+
+@deftypefun {inline void} outsb (void *@var{ptr}, int @var{count}, u_short @var{port})
+Output @code{count} bytes from the buffer pointed to by @var{ptr} to
+the I/O port @var{port}.
+@end deftypefun
+
+@deftypefun {inline void} outsw (void *@var{ptr}, int @var{count}, u_short @var{port})
+Output @code{count} words from the buffer pointed to by @var{ptr} to
+the I/O port @var{port}.
+@end deftypefun
+
+@deftypefun {inline void} outsl (void *@var{ptr}, int @var{count}, u_short @var{port})
+Output @code{count} double words from the buffer pointed to by
+@var{ptr} to the I/O port @var{port}.
+@end deftypefun
+
+@node Debug Output, , I/O Functions, Utility Functions
+@section Debugging Output
+@cindex Debugging output
+@cindex Output for debugging
+
+The nature of the system means that it is impossible to use normal
+debugging tools to isolate and correct semantic errors (bugs), this
+meant that we had to find a different method of debugging the system.
+When a module is suspected of containing a bug statements are inserted
+into the C source file or files that it is built from to output
+messages describing what it is doing at that moment.
+
+@findex DB
+A special macro @code{DB} is defined in the @file{<vmm/types.h>}
+header file, it must be given one argument: a list of all arguments to
+be given to an output function. When the preprocessor symbol
+@code{DEBUG} is defined at the very start of a file all @code{DB}
+statements are expanded into calls to a function called
+@code{kprintf}, otherwise they expand to a null statement. Usually
+@code{kprintf} is defined to point to the kernel's @code{printf}
+function. Note that @code{DB} statements need two sets of parentheses.
+A file using the @code{DB} macro might look something like the
+following.
+
+@example
+#define DEBUG
+
+#include <vmm/kernel.h>
+#define kprintf kernel->printf
+
+int
+foo(int bar)
+@{
+    int result;
+    DB(("foo: bar=%d\n", bar));
+    result = bar * 42;
+    DB(("foo: result=%d\n", result));
+    return result;
+@}
+@end example
+
+Since the debug statements have absolutely no effect when the
+@code{#define DEBUG} line is not present there is no need to delete
+them after a bug has been found. If they are left in place they will
+be ready for the next time a bug is encountered in the file.
+
+Normally a @code{DB} statement will have no effect on the function it
+is called from. However, each call does take a certain amount of time:
+this may be enough to hide some fiendish bugs.

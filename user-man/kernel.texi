@@ -1,0 +1,72 @@
+
+The kernel provides the basic functionality of the system. You, the
+user, don't need to know much about it. It defines the following shell
+commands.
+
+@deffn {Command} sysinfo options@dots{}
+Prints information describing the current state of the system to the
+shell. Possible flags for the @var{options} parameters are:
+
+@table @code
+@item -irq
+Print the currently installed IRQ handlers.
+
+@item -dma
+Print the allocated DMA channels.
+
+@item -mods
+List the currently loaded modules.
+
+@item -mm
+Print the state of the memory management subsystem; the number of free
+and available pages and the kernel break address.
+
+@item -ps
+List all the `live' tasks and information about them.
+@end table
+@end deffn
+
+@deffn {Command} cookie
+Print the contents of the `cookie jar', when the system is booted this
+is filled with information about the hardware devices which the system
+possesses.
+@end deffn
+
+@deffn {Command} date
+Display the current date and time.
+@end deffn
+
+@deffn {Command} kill pid
+Immediately kills the task (or virtual machine) whose ID is
+the integer @var{pid}. If no task with this ID exists or the task may
+not be killed an error message is printed.
+@end deffn
+
+@deffn {Command} freeze pid
+Suspend the task (or virtual machine) whose process-ID is the integer
+@var{pid}. The task will not be runnable until the @code{thaw} command
+is used to reverse the effect of this command.
+@end deffn
+
+@deffn {Command} thaw pid
+Allow the task with ID @var{pid} to run again. This undoes the effect
+of the @code{freeze} command.
+@end deffn
+
+@deffn {Command} open module-name
+This command attempts to open the module called @var{module-name}.
+This ensures that the module is loaded into memory. If the module can
+be opened successfully it is immediately closed, otherwise an error
+message is printed.
+@end deffn
+
+@deffn {Command} expunge module-name
+Try to remove the module called @var{module-name} from memory. This
+only works if the module has no outstanding references to it and it
+actually allows you to expunge it. If it can't be expunged an error
+message is printed.
+@end deffn
+
+@deffn {Command} sleep time
+This command suspends the shell for @var{time} seconds.
+@end deffn

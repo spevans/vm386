@@ -1,0 +1,78 @@
+
+The header file @file{<vmm/types.h>} defines the standard types used
+throughout the system, this chapter lists these types, how they are
+defined, and in some cases where they should be used.
+
+Note that the standard C integer types are not listed (i.e.
+@code{char}, @code{short}, @code{int} and @code{long}). Throughout the
+system we assume that chars are 8 bits, shorts are 16 bits and longs
+are 32 bits. We also assume that chars are signed.
+
+@table @code
+@item int32
+@tindex int32
+A 32 bit signed integer. Defined as @code{int}.
+
+@item u_int
+@tindex u_int
+An unsigned integer. Defined as @code{unsigned int}.
+
+@item u_long
+@tindex u_long
+@itemx u_int32
+@tindex u_int32
+An unsigned 32 bit integer. Defined as @code{unsigned long}.
+
+@item int16
+@tindex int16
+A signed 16 bit integer. Defined as @code{short}
+
+@item u_short
+@tindex u_short
+@itemx u_int16
+@tindex u_int16
+An unsigned 16 bit integer. Defined as @code{unsigned short}.
+
+@item int8
+@tindex int8
+A signed 8 bit integer. Defined as @code{char}.
+
+@item u_char
+@tindex u_char
+@itemx u_int8
+@tindex u_int8
+An unsigned 8 bit integer. Defined as @code{unsigned char}.
+
+@item time_t
+@tindex time_t
+An unsigned integer type used to store a time and date value. Stored
+as the number of seconds since January 1st, 1970. Defined as
+@code{unsigned long}. @xref{Time and Date Handling}.
+
+@item size_t
+@tindex size_t
+An unsigned integer type used to store the size of an object in bytes.
+
+@item bool
+@tindex bool
+A boolean value, either @code{TRUE} (non-zero) or @code{FALSE} (zero).
+Defined as @code{char}.
+@end table
+
+The following objects are not types, they are macros used to define
+certain common values used throughout the system.
+
+@table @code
+@item NULL
+@vindex NULL
+A null pointer of undefined type.
+
+@item TRUE
+@vindex TRUE
+A true boolean value. This is defined as the value one but any non-zero
+integer is actually a true boolean.
+
+@item FALSE
+@vindex FALSE
+A false boolean value, defined as zero.
+@end table

@@ -1,0 +1,232 @@
+This chapter documents the debugging facilities.
+
+These debugging tools were developed initially to aid in development
+of the kernel and it's modules, but can be applied to virtual machines.
+The tools available basically only allow the display of memory, code and
+various processor structures.
+
+The commands defined by the @code{debug} module are:
+
+@enumerate
+@item
+x - Print the contents of a kernel logical address.
+
+@item
+poke - Set the value of a double-word at a kernel logical address.
+
+@item
+dis - Disassemble a region of memory, with options for 16-bit code and
+regions within the user-space.
+
+@item
+dgdt - Show the contents of a selector entry.
+
+@item
+dtss - Show the contents of a TSS.
+
+@item
+dr - Set the value of the i386 debugging registers.
+
+@item
+d - Dump, in hexadecimal and ASCII format, a region of memory.
+
+@item
+strsrch - Search a region of memory for a specified ASCII string.
+@end enumerate
+
+@menu
+* x::
+* poke::
+* dis::
+* dgdt::
+* dtss::
+* dr::
+* d::
+* strsrch::
+@end menu
+
+@node x, poke, , Debugger
+@section x
+@findex x
+
+@example
+x @var{addr} @dots{}
+@end example
+
+Displays the value at kernel logical address ADDR. The display
+is in the following formats:
+
+@enumerate
+@item
+unsigned long word, hexadecimal
+
+@item
+unsigned short word, hexadecimal
+
+@item
+unsigned character byte, hexadecimal
+
+@item
+unsigned character byte, ASCII character
+@end enumerate
+
+If more than one address is specified, the contents of each address
+will be displayed. No checks are done on the addresses to verify
+their validity.
+
+@node poke, dis, x, Debugger
+@section poke
+@findex poke
+
+@example
+poke @var{addr} @var{value}
+@end example
+
+Sets the double-word at address ADDR to the value VALUE. No checks
+are performed on the address or the value to verify their
+validity.
+
+@node dis, dgdt, poke, Debugger
+@section dis
+@findex dis
+
+@example
+dis [-user] [-16] [-pid @var{pid}] [@var{start}] [@var{length}]
+@end example
+
+Disassembles the specified block of memory, or continues
+disassembly after the previous block of memory.
+
+Available options are as follows:
+
+@table @code
+@item -user
+Specifies that the address is in the user area of memory, not the
+kernel area.
+
+@item -16
+Specifies that the memory region should be disassembled as 16-bit
+(real-mode) code, rather than 32-bit (protected-mode) code.
+
+@item -pid @var{pid}
+Uses the memory region of the process specified by the process ID
+in @var{pid}.
+@end table
+
+No checks are performed to check that the memory region is valid.
+
+@node dgdt, dtss, dis, Debugger
+@section dgdt
+@findex dgdt
+
+@example
+dgdt @var{entry}
+@end example
+
+Displays the contents of the specified selector, where @var{entry} >= 0.
+The information is presented in a textual manner, and to ensure
+consistency of the data, interrupts are temporarily disables while the
+selector is being accessed.
+
+No checks are performed to validate the specified value.
+
+@node dtss, dr, dgdt, Debugger
+@section dtss
+@findex dtss
+
+@example
+dtss @var{addr}
+@end example
+
+Displays the data at the kernel logical address specified in 
+@var{addr} in the format of a Task State Segment (TSS).
+
+No checks are performed to validate the specified address.
+
+@node dr, d, dtss, Debugger
+@section dr
+@findex dr
+
+@example
+dr @var{n} @var{addr} w|rw|x 1|2|4
+@end example
+
+Sets the i386 debug register @var{n} to the linear address
+specified by @var{addr}, with the flags given.
+
+Available flags:
+
+@table @code
+@item w
+Sets the debug mode to "write" accesses.
+
+@item rw
+Sets the debug mode to "read or write" accesses.
+
+@item x
+Sets the debug mode to "execution" accesses.
+@end table
+
+The numeric flags specify the size of the access in bytes.
+
+@node d, strsrch, dr, Debugger
+@section d
+@findex d
+
+@example
+d [-u] [-p @var{pid}] [@var{start}] [@var{length}]
+@end example
+
+Dumps, in a tabular format, a memory region in both hexadecimal and
+ASCII format. If no address is specified, display continues after
+the last displayed block. Similarly, if no length is specified,
+the last specified length is used (defaulting to 128 bytes, which
+gives 8 lines of display).
+
+Options:
+
+@table @code
+@item -u
+Specifies that the address is in the user area.
+
+@item -p @var{pid}
+Uses the memory region of the process specified by the process ID
+in @var{pid}.
+@end table
+
+Checks are performed to ensure that the entire region of memory
+that would be displayed are mapped into memory, reporting
+failure if they are not.
+
+@node strsrch, , d, Debugger
+@section strsrch
+@findex strsrch
+
+@example
+strsrch [-c] [-u] [-p @var{pid}] [@var{start}] [@var{count}] [@var{string}]
+@end example
+
+Searches a memory region for all occurrences of an ASCII string.
+If no address is specified, display continues after
+the last displayed block. Similarly, if no length is specified,
+the last specified length is used.
+Also, if no string is specified, the last string is used.
+
+Options:
+
+@table @code
+@item -c
+When specified, a check will be made for every string-compare that
+it is entirely mapped, rather than for the entire region of memory.
+This enables a scan of larger, perhaps fragmented areas of memory.
+If not specified, a message reporting failure is issued indicating
+that the memory region is not entirely mapped.
+
+@item -u
+Specifies that the address is in the user area.
+
+@item -p @var{pid}
+Uses the memory region of the process specified by the process ID
+in @var{pid}.
+@end table
+

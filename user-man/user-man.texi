@@ -1,0 +1,97 @@
+\input texinfo  @c -*-Texinfo-*-
+@setfilename user-man.info
+@settitle VMM User Manual
+@footnotestyle end
+@iftex
+@afourpaper
+@end iftex
+
+@titlepage
+@title VMM User Manual
+@subtitle A virtual machine monitor for the Intel 80386
+@author S.P.S. Evans
+@author J.S. Harper
+@author C.J. Luke
+@end titlepage
+
+@ifinfo
+@node Top, Introduction, (dir), (dir)
+@top VMM User Manual
+
+@menu
+* Introduction::
+* Overview::
+* Shell::
+* Filing System::
+* Kernel::
+* Devices::
+* Virtual Machines::
+* Debugger::
+
+* Command Index::
+* Subject Index::
+@end menu
+@end ifinfo
+
+@node Introduction, Overview, Top, Top
+@chapter Introduction
+@cindex Introduction
+
+@include intro.texi
+
+@node Overview, Shell, Introduction, Top
+@chapter System Overview
+@cindex System overview
+@cindex Overview of the system
+
+@include overview.texi
+
+@node Shell, Filing System, Overview, Top
+@chapter The Shell
+@cindex Shell
+
+@include shell.texi
+
+@node Filing System, Kernel, Shell, Top
+@chapter The Filing System
+@cindex Filing system
+
+@include fs.texi
+
+@node Kernel, Devices, Filing System, Top
+@chapter The Kernel
+@cindex Kernel
+
+@include kernel.texi
+
+@node Devices, Virtual Machines, Kernel, Top
+@chapter Devices
+@cindex Devices
+
+@include devs.texi
+
+@node Virtual Machines, Debugger, Devices, Top
+@chapter Virtual Machines
+@cindex Virtual machines
+
+@include vm.texi
+
+@node Debugger, Command Index, Virtual Machines, Top
+@chapter The Debugger
+@cindex Debugger
+
+@include debug.texi
+
+@node Command Index, Subject Index, Debugger, Top
+@unnumbered Index of Shell Commands
+
+@printindex fn
+
+@node Subject Index, , Command Index, Top
+@unnumbered Subject Index
+
+@printindex cp
+
+@contents
+@bye
+

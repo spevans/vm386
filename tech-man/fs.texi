@@ -1,0 +1,821 @@
+@c -*-Texinfo-*-
+
+This chapter of the manual documents the system's filing system, and
+the interface it provides to other modules.
+
+@menu
+* Filesystem Introduction::
+* Filesystem Structure::
+* File Names::
+* File Handling::
+* Directory Handling::
+* Device Handling::
+* The Buffer Cache::
+* Library Functions::
+@end menu
+
+@node Filesystem Introduction, File Names, , Filing System
+@section Introduction
+@cindex Filing system, introduction
+
+The filing system provides a means of storing data on block devices.
+Files are organised in a tree-like structure through the use of
+@dfn{directories}. There is no limit on the number of files or
+directories that a directory can contain.
+
+All data structures and functions documented in this chapter are
+defined in the C header file @file{<vmm/fs.h>}.
+
+The filing system is organised as a single module (@pxref{Modules})
+whose name is @samp{fs}. To get a pointer to this module something
+like the following code would be needed:
+
+@example
+#include <vmm/fs.h>
+#include <vmm/kernel.h>
+
+@dots{}
+
+struct fs_module fs;
+
+@dots{}
+
+    fs = (struct fs_module *)kernel->open_module("fs", SYS_VER);
+    if(fs != NULL) @{
+        /* Use the file system module.. */
+        @dots{}
+@end example
+
+All the functions documented in this chapter are actually members of
+this module. For example to call the @code{open} function:
+
+@example
+struct file *fh;
+fh = fs->open("/usr/foo", F_READ);
+@end example
+
+@node File Names, Filesystem Structure, Filesystem Introduction, Filing System
+@section File Names
+@cindex File names
+@cindex Filing system, file names
+
+Each file (or directory) can be located through the use of a
+@dfn{file name}. Each file name tells the system how to locate the
+file it specifies by listing the directories that have to be
+traversed from the current directory and then the name of the
+actual file separated by @samp{/} characters.
+
+Other meta characters include @samp{:} to denote a device name (for
+example, the file name @samp{hda1:foo} denotes the file @samp{foo} on
+the device @samp{hda1}) or the root directory of the current device
+(for example @samp{:foo}, the file @samp{foo} in the root of the
+current device).
+
+Each directory contains two special entries, @samp{.} refers to this
+directory and @samp{..} refers to the directory above this one.
+
+Finally, a @samp{/} character at the start of a file name refers to the
+system's global root directory.
+
+The following table contains several example file names together with
+a description of how the filing system uses them to locate the file or
+directory that they specify.
+
+@table @file
+@item foo
+@itemx ./foo
+The file named @file{foo} in the current directory.
+
+@item foo/bar
+The file named @file{bar} in the directory called @file{bar} in the
+current directory.
+
+@item ../foo
+The file called @file{foo} in the parent of the current directory.
+
+@item /foo
+The file named @file{foo} in the system's root directory.
+
+@item hda:
+The root directory of the device called @file{hda} (the first IDE hard
+disk).
+
+@item hda:foo
+The file called @file{foo} in the root directory of the device called
+@file{hda}.
+
+@item :foo
+The file named @file{foo} in the root directory of the device which the
+current directory is stored on.
+@end table
+
+@node Filesystem Structure, File Handling, File Names, Filing System
+@section Filesystem Structure
+@cindex Filesystem structure
+@cindex Filing system, structure
+@cindex Inodes
+
+Our filing system has been modelled largely on the type of filing
+system often used by the UNIX operating system. That is, with inodes,
+indirect blocks, etc@dots{}
+
+When a file system is created a certain amount of space is set aside
+for @dfn{inodes}. An inode is a data object defining a single file, it
+is actually defined as:
+
+@tindex struct inode
+@example
+struct inode @{
+    /* Flags defining the permissions and
+       type of the file. */
+    u_long attr;
+    /* The size, in bytes, of the file. */
+    size_t size;
+    /* The time that the file was last modified. */
+    time_t modtime;
+    /* The number of references to this inode. */
+    u_long nlinks;
+    /* Pointers to data blocks. data[9->11] are
+       single, double and triple indirect blocks. */
+    u_long data[12];
+@};
+@end example
+
+Since a device's inodes are stored contiguously in a known location on
+the disk each inode has a unique (to the device) identifier; its index
+in the inode table. This number is called the inode's @dfn{i-number}.
+
+Directories are stored in files, that is, the data defining the
+contents of the directory (the name of the entry and the i-number it
+points to) is contained in a file which has an entry (i.e. its
+i-number) in the directory above. To the filing system the only
+difference between a file and a directory is the value of the
+@code{attr} field in the object's inode.
+
+Each entry in a directories data-file is defined as being:
+
+@tindex struct dir_entry
+@example
+#define NAME_MAX 27
+struct dir_entry @{
+    /* A null name means a free slot. */
+    char name[NAME_MAX + 1];
+    u_long inum;
+@};
+@end example
+
+Two bitmaps are used to record the allocated portions of each device,
+the inode bitmap codes which inodes are in use while the data bitmap
+records the same information for data blocks.
+
+@node File Handling, Directory Handling, Filesystem Structure, Filing System
+@section File Handling
+@cindex File handling
+@cindex Filing system, file handling
+
+The main objective of the filing system is to provide tasks running in
+with the ability to access individual files. The functions to do this
+are documented in this section.
+
+@menu
+* File Handles::
+* File I/O::
+* Hard Links::
+* Symbolic Links::
+* Other File Operations::
+@end menu
+
+@node File Handles, File I/O, , File Handling
+@subsection File Handles
+@cindex File handles
+@cindex Filing system, file handles
+@tindex struct file
+
+Most of the functions which perform operations on files take a
+parameter known as a @dfn{file handle} to specify which file to
+operate on. File handles are associated with a single file in the
+filing system and contain state information such as the position in
+the file which the next read or write will occur at.
+
+To obtain a file handle a module must call the function @code{open}
+with the name of the file to be opened (@pxref{File Names}) and an
+integer defining how the handle will be used.
+
+@deftypefn {fs Function} {struct file *} open (const char *@var{filename}, u_long @var{mode})
+This function creates a new file handle and associates it with the
+file whose name is @var{filename}. The file position attribute is
+initially set to zero (the first character in the file).
+
+The argument @var{mode} is a bit-mask created by a bitwise-OR of the
+necessary values. The possible values are:
+
+@vtable @code
+@item F_READ
+Open the file for reading.
+
+@item F_WRITE
+Open the file for writing. Note that combining @code{F_READ} and
+@code{F_WRITE} allows both read and write access to the file.
+
+@item F_CREATE
+Create the file if it does not already exist.
+
+@item F_TRUNCATE
+Delete the contents of the file as it is opened.
+
+@item F_ALLOW_DIR
+When this bit is set @code{open} does not signal an error if the file
+being opened is actually a directory.
+
+@item F_DONT_LINK
+Setting this bit prevents the following of symbolic links as the file
+is opened (@pxref{Symbolic Links}).
+@end vtable
+
+If this function is successful it will return a pointer to the newly-
+created file handle, otherwise if an error occurs a null pointer is
+returned and the task's @code{errno} field is set to a suitable value.
+@end deftypefn
+
+When a task has finished using a file handle it should close it (note
+that there is no automatic resource tracking: any open file handles
+will not be garbage-collected). The following function should be used
+for this purpose.
+
+@deftypefn {fs Function} void close (struct file *@var{file})
+This function deallocates the file handle @var{file}, reclaiming all
+the resources that it uses. It should only be called when @var{file}
+will not be used in the future.
+@end deftypefn
+
+It is often useful to `clone' file handles, the @code{dup} function is
+provided for this purpose.
+
+@deftypefn {fs Function} {struct file *} dup (struct file *@var{source})
+This function creates a new file handle which is associated with the
+same file as its sole argument, the file handle @var{source}.
+
+The mode attribute of the new file handle is the same as that of
+@var{source} and its file position is set to the beginning of the file.
+
+If this function is successful it will return a pointer to the new
+file handle, if an error occurs it will return a null pointer and set
+the task's @code{errno} to an informative value.
+@end deftypefn
+
+@node File I/O, Hard Links, File Handles, File Handling
+@subsection File Input and Output
+@cindex File I/O
+@cindex File handling, file I/O
+
+This section of the manual documents the I/O primitives used to read
+and write data to a file specified by a file handle.
+
+@deftypefn {fs Function} long read (void *@var{buf}, size_t @var{length}, struct file *@var{file})
+This function reads as many characters as possible not exceeding the
+value of the parameter @var{length} from the file specified by the
+file handle @var{file}.
+
+These characters are stored sequentially in the area of memory (in the
+kernel segment) located by the pointer @var{buf}. The value of the
+file handle's file position attribute defines where in the file the
+characters are read from.
+
+The number of characters actually read is returned, this may be less
+than the value of the @var{length} parameter, for example if the end
+of the file is reached. If an error occurs this function returns a
+negative error value (and @code{errno} is also set).
+
+The file handle's position attribute is advanced by the number of
+characters actually read.
+@end deftypefn
+
+@deftypefn {fs Function} long write (void *@var{buf}, size_t @var{length}, struct file *@var{file})
+This function attempts to write @var{length} characters from the
+buffer pointed to by @var{buf} (in the kernel segment) to the file
+specified by the file handle @var{file}.
+
+The characters are written at the position defined by the file handle's
+file position attribute.
+
+The value returned is the number of characters actually written
+(usually @var{length} but not always) or a negative error code. Note
+that the task's @code{errno} value is set to the same error.
+
+The file handle's position attribute is advanced by the number of
+characters actually written.
+@end deftypefn
+
+@deftypefn {fs Function} long seek (struct file *@var{file}, long @var{arg}, int @var{type})
+This function is used to adjust the value of a file handles file
+position attribute (which defines where in the file characters are
+read and written).
+
+The @var{type} parameter defines how the value @var{arg} is used to
+adjust the file position of the file handle @var{file}. It can take
+one of the following values:
+
+@vtable @code
+@item SEEK_ABS
+This causes the file position to be set @var{arg} characters from the
+beginning of the file.
+
+@item SEEK_REL
+Adds @var{arg} to the current value of the file position to obtain the
+new value (note that a negative @var{arg} will move backwards in the
+file).
+
+@item SEEK_EOF
+Sets the file position to be @var{arg} characters back from the last
+character in the file.
+@end vtable
+
+The value that this function returns is either the @emph{new} value of
+the file position (a positive value), or a negative error code
+(@code{errno} is set to reflect the same error).
+@end deftypefn
+
+@node Hard Links, Symbolic Links, File I/O, File Handling
+@subsection Hard Links
+@cindex Hard links
+@cindex Filing system, hard links
+
+As was explained in the section about the structure of a filing system
+(@pxref{Filesystem Structure}) each individual file has an inode to
+store its details. Although there is usually a one to one relation
+between directory entries and inodes this does not have to be the case.
+
+Each directory entry constitutes a @dfn{hard link} to the file
+represented by the inode that it points to. Within a device there is
+no limit to the number of directory entries that may point to an
+inode; hard links may not point to an inode on a different device.
+
+@deftypefn {fs Function} bool make_link (const char *@var{name}, struct file *@var{src})
+This function creates a new hard link to the file pointed to by the
+file handle @var{src}. The new link is called @var{name}, @var{name}
+is interpreted relative to the task's current directory.
+
+If the function succeeds in creating the link it returns the value
+@code{TRUE}, otherwise it sets the task's @code{errno} to a suitable
+value and returns the value @code{FALSE}.
+@end deftypefn
+
+@deftypefn {fs Function} bool remove_link (const char *@var{name})
+This function deletes the directory entry called @var{name}. If this
+is the last link to the inode that @var{name} points at the inode and
+its associated data will be deleted.
+
+Note that it is a @emph{very} bad idea to call this with @var{name}
+referring to a directory: its likely to result in stranded data blocks.
+Instead use the function @code{remove_directory} (@pxref{Directory Handling}).
+
+When this function succeeds it returns @code{TRUE}, otherwise it
+returns @code{FALSE} after setting the task's @code{errno} to an
+informative value.
+@end deftypefn
+
+@node Symbolic Links, Other File Operations, Hard Links, File Handling
+@subsection Symbolic Links
+@cindex Symbolic links
+@cindex Filing system, symbolic links
+
+Although useful in many situations hard links have several defects:
+they can't be used across devices and they can be hard to keep track
+of. To solve these problems our filing system also provides
+@dfn{symbolic links}; instead of providing a link from a directory
+entry to an inode as hard links do, symbolic links provide a link from
+a directory entry to another directory entry.
+
+Since the link is entirely contained in the inode of the directory
+entry initiating the link whatever happens to the object which is the
+target of the link, the link cannot be broken (unless the object is
+deleted, in which case attempting to open the link will fail until an
+object of the target's name is re-created).
+
+Any attempt to open a directory entry which is a symbolic link will
+result in the target of the link being opened, if the target of the
+link is actually another symbolic link the process will be repeated.
+Note that the @code{F_DONT_LINK} option to the @code{open} function
+(@pxref{File Handles}) will result in the link itself being opened.
+
+@deftypefn {fs Function} bool make_symlink (const char *@var{name}, const char *@var{target})
+This function creates a symbolic link called @var{name} which points
+to the directory entry called @var{target}.
+
+If this function succeeds in creating the new link it returns
+@code{TRUE}, otherwise it sets the task's @code{errno} to a suitable
+value and returns @code{FALSE}.
+@end deftypefn
+
+@node Other File Operations, , Symbolic Links, File Handling
+@subsection Other File Operations
+@cindex Other file operations
+@cindex Filing system, misc. file operations
+
+This section of the manual documents the other operations available
+with files. Firstly there are a number of macros which can be used to
+extract the individual pieces of information held in a file handle.
+
+@deftypefn Macro u_long F_ATTR (struct file *@var{file})
+Expands to the attribute field of the inode associated with the file
+handle @var{file}.
+@end deftypefn
+
+@deftypefn Macro u_long F_NLINKS (struct file *@var{file})
+Expands to the number of hard links pointing at the inode associated
+with the file handle @var{file}.
+@end deftypefn
+
+@deftypefn Macro u_long F_SIZE (struct file *@var{file})
+Expands to the size of the file associated with the file handle
+@var{file}.
+@end deftypefn
+
+@deftypefn Macro time_t F_MODTIME (struct file *@var{file})
+Expands to the date-stamp specifying the last time that this file was
+modified.
+@end deftypefn
+
+@deftypefn Macro u_long F_INUM (struct file *@var{file})
+Expands to the i-number of the inode associated with the file handle
+@var{file}.
+@end deftypefn
+
+@deftypefn Macro int F_IS_DIR (struct file *@var{file})
+Expands to a non-zero value if the file handle @var{file} is
+associated with a directory.
+@end deftypefn
+
+@deftypefn Macro int F_IS_SYMLINK (struct file *@var{file})
+Expands to a non-zero value if the file handle @var{file} is
+associated with a symbolic link.
+@end deftypefn
+
+@deftypefn Macro int F_IS_REG (struct file *@var{file})
+Expands to a non-zero value if the file handle @var{file} is
+associated with a regular file.
+@end deftypefn
+
+@deftypefn Macro int F_READABLE (struct file *@var{file})
+Expands to a non-zero value if the file associated with the file handle
+@var{file} is readable.
+@end deftypefn
+
+@deftypefn Macro int F_WRITEABLE (struct file *@var{file})
+Expands to a non-zero value if the file associated with the file handle
+@var{file} is writable.
+@end deftypefn
+
+@deftypefn Macro int F_EXECABLE (struct file *@var{file})
+Expands to a non-zero value if the file associated with the file handle
+@var{file} is executable.
+@end deftypefn
+
+The following functions also operate on files.
+
+@deftypefn {fs Function} bool set_file_size (struct file *@var{file}, size_t @var{size})
+This function sets the size of the file associated with the file handle
+@var{file} to be @var{size} characters.
+
+Note that no data is actually deleted from the file, even if
+@var{size} is smaller than the current size of the file!
+
+If this function succeeds it will return @code{TRUE}, otherwise it
+will set @code{errno} to a suitable value and return @code{FALSE}.
+@end deftypefn
+
+@deftypefn {fs Function} bool truncate_file (struct file *@var{file})
+This function deletes all data associated with the file pointed to by
+the file handle @var{file} and sets its size to be zero characters.
+
+If this function succeeds it will return @code{TRUE}, otherwise it
+will set @code{errno} to a suitable value and return @code{FALSE}.
+@end deftypefn
+
+@deftypefn {fs Function} bool set_file_mode (const char *@var{name}, u_long @var{modes})
+This function sets the mode bits of the inode pointed to by the
+directory entry called @var{name} to the bit-mask @var{modes}.
+
+To create the @var{modes} value do a bitwise-OR of any of the
+following values:
+
+@vtable @code
+@item ATTR_NO_READ
+When this bit is set the file is unreadable.
+
+@item ATTR_NO_WRITE
+When this bit is set the file may not be written to.
+
+@item ATTR_EXEC
+When set this bit allows the file to be executed.
+@end vtable
+
+If this function succeeds it will return @code{TRUE}, otherwise it
+will set @code{errno} to a suitable value and return @code{FALSE}.
+@end deftypefn
+
+@node Directory Handling, Device Handling, File Handling, Filing System
+@section Directory Handling
+@cindex Directory handling
+@cindex Filing system, directory handling
+@cindex Current directory
+@cindex Filing system, current directory
+
+Directories are a special type of file, they store a list of names
+together with the i-number of the inode that that directory entry
+refers to. Directories are organised hierarchically, the top of the
+tree of directories on a device is known as the device's
+@dfn{root directory}. The @dfn{system root directory} is the directory
+denoted by a leading slash in a file name, this can be any directory
+in the filing system and is defined when the system is compiled. It
+must be a directory that is available when the system is booted to
+allow disk-based modules to be loaded (@pxref{Modules}).
+
+Each directory has two special entries: @file{.} which is a hard link
+to the directory itself, and @file{..} which is a hard link to the
+directory's parent directory. Whenever a directory is created these
+entries are automatically produced.
+
+Each task has an attribute called its @dfn{current directory}, this is
+the point in the filing system from which all file names that the task
+uses are resolved. Obviously file names which begin with a device
+specification or a slash (i.e. @file{hda4:lib} or @file{/usr}) do not
+actually use the current directory.
+
+Since directories are stored as (special) files the @code{open}
+function can be used to get a handle on a directory; note that when
+opening a directory remember to specify the @code{F_ALLOW_DIR} option
+or an error will be signaled (@pxref{File Handles}).
+
+@deftypefn {fs Function} {struct file *} get_current_directory (void)
+This function creates a new file handle which has been opened on the
+current task's current directory. Note that this is equivalent to the
+following:
+
+@example
+fs->open(".", F_READ | F_WRITE | F_ALLOW_DIR);
+@end example
+
+If this function succeeds it will return a pointer to the new file
+handle, otherwise it will set the task's @code{errno} value
+accordingly and return a null pointer.
+@end deftypefn
+
+@deftypefn {fs Function} {struct file *} swap_current_directory (struct file *@var{new-dir})
+This function sets the current task's current directory to the file
+handle @var{new-dir} then returns the file handle which was previously
+the task's current directory.
+
+The only times this function will ever fail is when @var{new-dir} is
+not a handle on a directory. Note that setting the current directory
+to a null pointer is perfectly acceptable ---  it just means that the
+task does not have a current directory. From this it follows that if
+this function returns a null pointer it is not necessarily an error.
+
+After calling this function all responsibility for the file handle
+@var{new-dir} passes to the filing system --- therefore it @emph{should
+not} be closed. Also, responsibility for the file handle returned by
+this function (if it's not a null pointer) passes to the caller.
+@end deftypefn
+
+The next two functions allow the creation and deletion of directories.
+
+@deftypefn {fs Function} bool make_directory (const char *@var{name}, u_long @var{attr})
+This function creates a new directory called @var{name}, its attribute
+field is set to @var{attr} bitwise-OR'd with the value
+@code{ATTR_DIRECTORY}.
+
+This function returns @code{TRUE} if it succeeds, @code{FALSE}
+otherwise and @code{errno} is set to a suitable error code.
+@end deftypefn
+
+@deftypefn {fs Function} bool remove_directory (const char *@var{name})
+This function removes the directory entry called @var{name} which
+should be a directory, not a file.
+
+This will only succeed if the directory to be deleted is empty except
+for the two special links @file{.} and @file{..}.
+
+If it does succeed this function returns @code{TRUE}, otherwise
+@code{errno} is set accordingly and the function returns @code{FALSE}.
+@end deftypefn
+
+@node Device Handling, The Buffer Cache, Directory Handling, Filing System
+@section Device Handling
+@cindex Device handling
+@cindex Filing system, device handling
+
+Our filing system allows the use of different types of device very
+easily. As long as there is some way of mapping between fixed-size
+blocks and the index numbers of these blocks and the device's physical
+media it is possible to interface the device with the filing system.
+
+Each device in the system must be represented by an instance of the
+following structure (defined in @file{<vmm/fs.h>}):
+
+@tindex struct fs_device
+@example
+struct fs_device @{
+    /* The name of the device, used in path
+       names (i.e. `DEV:foo/bar') */
+    const char *name;
+
+    /* These return >=0 on success, or an E_??
+       value on error. If no disk is present they
+       should return E_NODISK. These functions may
+       put the current task to sleep if they want to.
+       Note that BLOCK is in FS_BLKSIZ sized blocks. */
+    long (*read_block)(void *user_data, blkno block,
+                       void *buf);
+    long (*write_block)(void *user_data, blkno block,
+                        void *buf);
+
+    /* Devices with removable media (i.e. floppys)
+       should define this function, when called it
+       returns E_NODISK if no disk is in the drive,
+       E_DISKCHANGE if a new disk was inserted since
+       it was last called, or 0 if nothing changed.
+       Note that this function may *not* sleep. */
+    long (*test_media)(void *user_data);
+
+    /* Each time one of the above functions is called
+       the following pointer is passed to it as it's
+       first argument. This allows device driver
+       functions to receive a reference to some internal
+       data structure. */
+    void *user_data;
+
+    /* Filesystem private data follows... */
+@end example
+
+These structures are allocated dynamically, the function to call to
+receive a new @code{struct fs_device} is called @code{alloc_device}.
+After filling in the fields of the newly allocated structure to
+suitable values the function @code{add_device} should be called to add
+the new device to the filing system's list of available devices.
+
+@deftypefn {fs Function} {struct fs_device *} alloc_device (void)
+Finds an unused device structure, marks it as being used and returns a
+pointer to it. If it is unable to allocate a new structure a null
+pointer is returned.
+@end deftypefn
+
+@deftypefn {fs Function} bool add_device (struct fs_device *@var{dev})
+This function adds the newly-allocate and filled in device structure
+@var{dev} to the list of available devices maintained by the filing
+system.
+
+When this function succeeds it returns @code{TRUE}, otherwise it
+returns @code{FALSE}.
+@end deftypefn
+
+@deftypefn {fs Function} bool remove_device (struct fs_device *@var{dev})
+This function removes the device @var{dev} from the filing system's
+list of available devices. When no outstanding references to @var{dev}
+exist it will be deallocated.
+
+When this function succeeds it returns @code{TRUE}, otherwise it
+returns @code{FALSE}.
+@end deftypefn
+
+@deftypefn {fs Function} {struct fs_device *} get_device (const char *@var{name})
+This function attempts to obtain a pointer to the device called
+@var{name}. If such a device exists its reference counter is
+incremented and a pointer to it returned. When the caller has finished
+with the returned pointer they should use the @code{release_device}
+function to remove themselves from the device's reference count.
+
+If no device called @var{name} exists a null pointer is returned.
+@end deftypefn
+
+@deftypefn {fs Function} void release_device (struct fs_device *@var{dev})
+This function is used to decrement the reference counter of the device
+@var{dev}. If no other references exist the device structure will be
+deallocated (this can only happen if @code{remove_device} has been
+called on @var{dev}).
+@end deftypefn
+
+@node The Buffer Cache, Library Functions, Device Handling, Filing System
+@section The Buffer Cache
+@cindex Buffer cache
+@cindex Filing system, buffer cache
+
+The filesystem's buffer cache is a device-independent method of
+cacheing the most heavily used blocks in the filing system. It also
+makes implementing the actual file system itself easier by removing
+the need for any static buffers.
+
+The filing system implementation itself makes no attempts to optimise
+the way it accesses blocks in the devices. For example every time a
+data blocks is needed up to three indirect blocks may also have to be
+read to find the location of the file's data block. The file-oriented
+parts of the filing system assume that if a block has to be read more
+than once in quick succession it will be in the buffer cache after the
+first read. This makes implementing the filing system a lot cleaner
+and less prone to bugs.
+
+Currently the buffer cache uses a fixed number of static buffers to
+cache the blocks and no attempt is made to delay the writing of
+buffers back to the disk they came from (this last because the system
+is still being developed and it is desirable that file systems are
+intact after a system crash). The interface to the buffer cache has
+been designed with these optimisations in mind, so that it would be
+possible to dynamically allocate buffers (from the system's available
+memory) and implement a lazy-write policy with little or no change to
+the other parts of the filing system.
+
+@deftypefn {fs Function} {struct buf_head *} bread (struct fs_device *@var{dev}, blkno @var{block})
+This function returns a pointer to a buffer in the buffer cache
+containing the contents of block number @var{block} of the device
+@var{dev}.
+
+If the function fails @code{errno} will be set to a suitable value and
+a null pointer will be returned.
+
+If the returned value is not a null pointer it should be applied to
+the function @code{brelse} after the caller has finished using the buffer.
+@end deftypefn
+
+@deftypefn {fs Function} bool brelse (struct buf_head *@var{buf})
+Signals that one of the references to the block in the buffer cache
+@var{buf} has been finished with. The parameter @var{buf} should have
+been obtained by previously calling @code{bread}.
+@end deftypefn
+
+@deftypefn {fs Function} bool bwrite (struct fs_device *@var{dev}, blkno @var{block}, const void *@var{buf})
+This function writes the block @var{block} to the device @var{dev}
+using the 1024 bytes stored at @var{buf}. The write will be performed
+through the buffer cache.
+
+The advantage of using this function over the alternative of using
+@code{bread} to read the block, updating its data and using
+@code{bdirty} to write it back is that it removes the need to read the
+block.
+
+When this function succeeds it returns @code{TRUE}, otherwise it sets
+@code{errno} suitably and returns @code{FALSE}.
+@end deftypefn
+
+@deftypefn {fs Function} bool bdirty (struct buf_head *@var{buf}, bool @var{write-now})
+This function signals to the buffer cache that the contents of the
+buffer in the buffer cache @var{buf} have been altered by the caller.
+
+If the @var{write-now} parameter is non-zero the block will
+immediately be written back to the device it came from.
+
+When the function succeeds it returns the value @code{TRUE}, otherwise
+@code{errno} is set and @code{FALSE} is returned.
+@end deftypefn
+
+@node Library Functions, , The Buffer Cache, Filing System
+@section Library Functions
+@cindex Library functions
+@cindex Filing system, library functions
+
+As well as providing the primitive operations for file handling the
+file system module also exports some higher-level functions to aid in
+the use of files.
+
+@deftypefn {fs Function} int putc (u_char @var{c}, struct file *@var{file})
+This function writes one character, the character @var{c}, to the file
+pointed to by the file handle @var{file}.
+
+This returns a positive value if the function succeeded, or a negative
+error value if it fails.
+@end deftypefn
+
+@deftypefn {fs Function} int getc (struct file *@var{file})
+This function reads the next character from the file @var{file} and
+returns it. If the end of the file is reached the value @code{EOF} is
+returned, if an error occurs a negative error code is returned.
+@end deftypefn
+
+@deftypefn {fs Function} {char *} read_line (char *@var{buf}, size_t @var{length}, struct file *@var{file})
+This function tries to read a single line of text from the file handle
+@var{file} into the buffer @var{buf}. The parameter @var{length}
+defines the size of the buffer; no more than this number of
+characters (including the terminating zero byte) will be placed in the
+buffer.
+
+If characters are read into the buffer @var{buf} will be returned,
+otherwise a null pointer will be returned.
+@end deftypefn
+
+@deftypefn {fs Function} int write_string (const char *@var{str}, struct file *@var{file})
+This function writes the zero-terminated string pointed to by @var{str}
+to the file handle @var{file}.
+
+Returns either the number of characters actually written or a negative
+error code.
+@end deftypefn
+
+@deftypefn {fs Function} int fvprintf (struct file *@var{file}, const char *@var{fmt}, va_list @var{args})
+This function is a version of the standard C function @code{vprintf}
+which writes its output to the file @var{file} and returns either the
+number of characters written or a negative error code.
+@end deftypefn
+
+@deftypefn {fs Function} int fprintf (struct file *@var{file}, const char *@var{fmt}, @dots{})
+This function is similar to the above documented @code{fvprintf}
+except it takes the arguments to the format specification on the stack.
+@end deftypefn

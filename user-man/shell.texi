@@ -1,0 +1,124 @@
+
+The @dfn{shell} is the system's user interface. It allows you, the
+user, to enter commands which the system then performs. When the
+system is initialised a special shell, called the @dfn{system shell}
+is created.
+
+@menu
+* Shell Basics::
+* Shell Scripts::
+* Online Help::
+* Shell Commands::
+@end menu
+
+@node Shell Basics, Shell Scripts, , Shell
+@section Basics
+@cindex Shell basics
+
+Each shell simply loops reading commands until it is told to exit,
+each time a command is required the current prompt is printed to the
+tty and a line of input is read from the same tty (@pxref{TTY Device}).
+
+Once a whole line has been read it is split into words, each of
+which is separated by a sequence of white-space characters (either
+spaces or tabs). To create a word which contains spaces it can be
+bracketed by two single-quote (@samp{'}) characters. If the first
+non-white space character in a line is a hash character (@samp{#}) the
+line is treated as a comment and ignored. 
+
+After tokenising its input line the shell uses the first word in the
+line to identify the command being invoked. It uses this word to
+search the table of available commands, if a match is found the action
+associated with this command is performed, using the remaining
+words in the command line as parameters.
+
+The system is not restricted to only one shell; the @code{shell} shell
+command and the hot key @kbd{Alt-@key{ESC}} both create a new shell
+process, running in a new tty.
+
+@node Shell Scripts, Online Help, Shell Basics, Shell
+@section Shell Scripts
+
+A @dfn{shell script} is a file containing lines of shell commands.
+This file can then be executed by the shell as though each line in the
+file had been entered by hand. The only difference is that no prompt
+is printed before each line. To execute a shell script use the
+@code{source} command.
+
+@findex .
+@deffn {Command} source @var{file-name}
+Execute in order the lines of the file called @var{file-name}. A
+synonym for this command is @code{.}.
+@end deffn
+
+To allow you to configure the system to your needs two special shell
+scripts can exist,
+
+@table @file
+@item /.profile
+This shell script is executed when the system has finished
+initialising itself.
+
+@item /.shrc
+This shell script is executed each time a new interactive shell is
+created.
+@end table
+
+@node Online Help, Shell Commands, Shell Scripts, Shell
+@section Online Help
+@cindex Online help
+@cindex Help, online
+@cindex Shell, online help
+
+To help you use the system the shell and its commands provide a
+simple online help system. Each command provides a short
+string documenting itself. The @code{help} shell command then uses
+these strings to provide short pieces of help information.
+
+@deffn {Command} help [command-name]
+This command implements the shell's online help system. Invoking the
+command with no parameter prints a list of the available commands to
+the shell's tty.
+
+When given, the @var{command-name} parameter should name a shell
+command, its documentation string is searched for and if it exists it
+will be printed to the tty.
+@end deffn
+
+@node Shell Commands, , Online Help, Shell
+@section Miscellaneous Commands
+@cindex Misc. shell commands
+@cindex Shell, misc. commands
+
+This section describes some of the other available shell commands.
+Note that these are only the commands provided by the shell.
+Commands provided by other modules of the system are documented with
+the rest of that module.
+
+@deffn {Command} echo @var{args}@dots{}
+Prints each member of @var{args} to the tty, followed by a newline
+character.
+@end deffn
+
+@deffn {Command} prompt @var{prompt}
+Set the string printed before each line in this shell to @var{prompt}.
+@end deffn
+
+@deffn {Command} quit
+Terminate the current shell.
+@end deffn
+
+@deffn {Command} cls
+Clear the screen of the current shell and move the cursor to its
+top-left corner.
+@end deffn
+
+@deffn {Command} shell
+Spawn a new sub-shell in a new tty.
+@end deffn
+
+@deffn {Command} ed @var{dest-file}
+Copies the following lines typed at the shell's tty to the file called
+@var{dest-file}. The original contents of the file are discarded. End
+the process by typing an end-of-file character (@kbd{Ctrl-d}).
+@end deffn

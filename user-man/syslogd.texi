@@ -1,0 +1,27 @@
+
+The system log daemon allows processes to send status and debugging output
+to a common file. The operation of the log daemon process can be controlled
+by the user to set how much information goes to the file or can completely
+stop all output to the logfile.
+
+@deffn {Command} syslog command
+This command controls operation of the system log daemon. The
+@var{command} parameter defines the operation performed, it can be one
+of the following:
+
+@table @code
+@item -stop
+Prevents any output going to the logfile.
+
+@item -start
+Allows output to go to the logfile.
+
+@item -level @var{new-level}
+This sets the logging level. Only processes which have a 
+logging level less than or equal to @var{new-level} will have output
+present in the logfile.
+
+@item -status
+Prints information regarding the current status of the log daemon.
+@end table
+@end deffn

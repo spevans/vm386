@@ -1,0 +1,198 @@
+@c This chapter documents the Printer Spooler.
+
+@menu
+* Spooler Introduction::
+* Spooler Operation::
+* Spooler Functions::
+@end menu
+
+@node Spooler Introduction, Spooler Operation, , Printer Spooler
+@section Spooler Introduction
+@cindex Printer spooler, introduction
+@cindex Spooler, introduction
+
+The Printer Spooler enables the printer to be shared among multiple processes.
+This allows each process to see a virtual printer which it can print to and
+also allows a process to submit a file for printing. It can be used by both
+native tasks and by virtual tasks via the @file{vprinter} module.
+
+@node Spooler Operation, Spooler Functions, Spooler Introduction, Printer Spooler
+@section Spooler Operation
+@cindex Printer spooler, operation
+@cindex Spooler, operation
+
+When a file is submitted for printing, its name is added to a list. A separate
+process processes this list in order to print the files. The list is processed
+in a FIFO (First In First Out) fashion. Although scheduling algorithms are 
+available including SJF (Shortest Job First) and LJF (Longest Job First), a
+FIFO system was used in order to maintain simplicity and functionality. A
+@dfn{virtual printer} can also be opened allowing a process to print to a file
+when it doesn't know how much is to be printed. When the file is closed, it is
+added to the list. This is used by the @samp{vprinter} module for emulating
+printer ports.
+
+When the thread handling the printing of files is initially created, it
+looks in the spool directory and if there are any files there it automatically
+adds them to the list. The spool directory is defined in the header file
+@file{<vmm/spooler.h>} and is by default set to @emph{spool}.
+
+Because of the dual access to the spool list by both the thread adding a spool
+file and the thread processing the spool list, access to the list is protected
+by a semaphore.
+
+@node Spooler Functions, , Spooler Operation, Printer Spooler
+@section Spooler Functions
+@cindex Printer spooler, functions
+@cindex Spooler, functions
+
+@subsection Adding A File To The Spooler
+@cindex Printer spooler, adding a file
+@cindex Spooler, adding a file
+
+If a process wishes to write its output to a file and then submit the file
+to be printed it can use the @code{new_spool_file} function to generate a
+unique file name.
+
+@vindex MAX_SPOOL_NAME
+@deftypefn {spooler Function} void new_spool_file (char *@var{fname})
+This function allows a process to obtain a unique name for use in creating
+temporary files in the spool directory.
+@var{fname} is a buffer into which the new name is written and should be able
+to hold a string of length @var{MAX_SPOOL_NAME} characters.
+This function does not return a value.
+@end deftypefn
+
+A process can add a file to the spooler using the @code{add_spool_file}
+function. This is a single call with nothing further being required.
+
+@deftypefn {spooler Function} bool add_spool_file (char *@var{fname})
+This function allows a process to submit a file to be printed by the spooler.
+@var{fname} is the name of the file to be printed. The spooler makes a copy
+of this file in the spool directory with a unique filename and adds it to the
+list of files to be printed.
+This returns @code{TRUE} if the file was spooled successfully or @code{FALSE}
+if an error occurred.
+@end deftypefn
+
+@subsection Using The Spooler As A Printer
+@cindex Printer spooler, using as a printer
+@cindex Spooler, using as a printer
+
+To use the spooler as if it were a virtual printer, a process open's the
+spool file to obtain a handle, writes to the file and then closes the file
+to have the data printed. The process can optionally discard the data it has
+written to the file.
+
+@deftypefn {spooler Function} int open_spool_file (char *@var{name})
+This function opens a spool file allowing a processing to write to the printer
+via a handle.
+@var{name} is the name that will appear in the spool list and is used as an 
+identifier so that the user can keep track of the file in the spool list.
+This returns -1 if an error occurred otherwise a handle to be used for other
+operations.
+@end deftypefn
+
+@deftypefn {spooler Function} void close_spool_file (int @var{handle})
+This function closes a spool file and adds it to the list of files to be 
+printed. 
+@var{handle} is the handle that was returned by a previous call to the
+function @code{open_spool_file}.
+This function does not return a value.
+@end deftypefn
+
+@deftypefn {spooler Function} void discard_spool_file (int @var{handle})
+This function closes a file but discards the file instead of adding it to the
+list of files to be printed. This allows a process to gracefully cleanup whilst
+not wanting any output to go to the printer.
+@var{handle} is the handle that was returned by a previous call to the
+function @code{open_spool_file}.
+This function does not return a value.
+@end deftypefn
+
+@deftypefn {spooler Function} void write_spool_file (int @var{handle}, char *@var{data}, int @var{len})
+This function allows a process to write data to the spool file.
+@var{handle} is the handle that was returned by a previous call to the
+function @code{open_spool_file}.
+@var{data} is the data to be written to the spool file. It may contain any
+data or characters.
+@var{len} is the len of @var{data} that is to be written to the spool file.
+This function does not return a value.
+@end deftypefn
+
+@subsection Example Function Usage
+
+The simplest way for a process to print a file already on disk is to use
+the @code{add_spool_file} function.
+
+@example
+#include <vmm/spooler.h>
+
+@dots{}
+
+/* add the file named `output' to the spool */
+if(spooler->add_spool_file("output")) @{
+
+    /* function succeeded */
+    @dots{}
+
+@} else @{
+
+    /* function failed */
+    @dots{}
+
+@}
+@end example
+
+To create a unique file name to use for a spool file, use the
+@code{new_spool_file} function.
+
+@example
+#include <vmm/spooler.h>
+
+@dots{}
+
+char fname[MAX_SPOOL_NAME];
+
+/* obtain a unique filename */
+spooler->new_spool_name(fname);
+@end example
+
+To use the spooler as a virtual printer, use the @code{open_spool_file}, 
+@code{write_spool_file} and @code{close_spool_file} functions.
+
+@example
+#include <vmm/spooler.h>
+
+@dots{}
+
+/* open a spool file, write to it, then close it */
+static char data[] = "Test string";
+int handle;
+
+if((handle = open_spool_file("test")) != -1) @{
+    spooler->write_spool_file(handle, data,
+                              sizeof(data));
+    spooler->close_spool_file(handle);
+@}
+@end example
+
+To discard the printer output instead of printing it, use the
+@code{discard_spool_file} function.
+
+@example
+#include <vmm/spooler.h>
+
+@dots{}
+
+/* open a spool file, write to it, then discard
+   the output from it */
+
+static char data[] = "Test string";
+int handle;
+
+if((handle = open_spool_file("test")) != -1) @{
+    spooler->write_spool_file(handle, data,
+                              sizeof(data));
+    spooler->close_spool_file(handle);
+@}
+@end example

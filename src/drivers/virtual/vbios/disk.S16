@@ -1,0 +1,84 @@
+/* disk.S16 -- 16-bit code for disk handling
+   John Harper. */
+
+#define __ASM__
+#include <vmm/vbios.h>
+
+
+	.globl	int_19
+int_19:
+	xor	ax,ax
+	mov	ds,ax
+
+	mov	dx,#0x0000		/* First try the floppy.. */
+	mov	cx,#0x0001
+	mov	ax,#0x0201
+	mov	bx,#0x7c00
+	mov	es,dx
+	int	0x13
+	jnc	loaded_ok
+try_hd:
+	xor	ax,ax
+	mov	es,ax
+	mov	dx,#0x0080		/* Then the hard disk. */
+	mov	cx,#0x0001
+	mov	ax,#0x0201
+	mov	bx,#0x7c00
+	int	0x13
+	jnc	loaded_ok
+
+failed:
+	mov	ah,#3
+	int	0x10
+	mov	ax,#0x1301
+	mov	bx,#0x0007
+	mov	cx,#fail_len
+	push	cs
+	pop	es
+	lea	bp,fail_txt
+	int	0x10
+key:
+	xor	ah,ah
+	int	0x16
+	test	al,al
+	jz	key
+	jmp	int_19
+
+loaded_ok:
+	jmpf	0x7c00,0
+
+fail_txt:
+	.ascii	"Non-system disk or disk error, press a key.."
+fail_txt_end:
+fail_len = fail_txt_end - fail_txt
+
+	.globl	disk_init
+disk_init:
+	push	ds
+	push	eax
+	xor	ax,ax
+	mov	ds,ax
+	push	cs
+	pop	ax
+	shl	eax,#16
+	mov	ax,#hd0_info
+	mov	(4*0x41),eax
+	mov	ax,#hd1_info
+	mov	(4*0x46),eax
+	mov	ax,#fd_params
+	mov	(4*0x1e),eax
+	pop	eax
+	pop	ds
+	ret
+
+hd0_info:
+	.space	16
+hd1_info:
+	.space	16
+fd_params:
+	/* These values are copied from that XT-bios source. They're
+	   probably incorrect for us.. */
+	.byte	0xc0, 0x02, 0x25, 0x02
+	.byte	0x08, 0x2a, 0xff, 0x50
+	.byte	0xf6, 0x19, 0x04
+

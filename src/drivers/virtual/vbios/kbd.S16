@@ -1,0 +1,94 @@
+/* kbd.S -- Keyboard VBIOS functions.
+   John Harper. */
+
+#define __ASM__
+#include <vmm/vbios.h>
+
+	.globl	int_9
+int_9:
+	/* Get the vkbd.module to handle this for us :) */
+	ARPL(0x09)
+	mov	al,#0x20
+	out	0x20,al
+	iret
+
+	.globl	int_16
+int_16:
+	push	ds
+	push	bx
+	mov	bx,#0x40
+	mov	ds,bx
+
+ 	test	ah,ah
+	jz	read_kbd
+	dec	ah
+	jz	read_stat
+	dec	ah
+	jz	read_shift
+	dec	ah
+	jz	int_16_ret
+	dec	ah
+	jz	int_16_ret
+	dec	ah
+	jz	write_kbd
+	sub	ah,#11
+	jz	read_kbd
+	dec	ah
+	jz	read_stat
+	dec	ah
+	jz	read_shift
+	
+int_16_ret:
+	pop	bx
+	pop	ds
+	iret
+
+read_kbd:
+	mov	bx,(KBD_BUF_HEAD)
+	cmp	bx,(KBD_BUF_TAIL)
+	jne	got_key	
+	sti
+	hlt
+	cli
+	jmp	read_kbd
+got_key:
+	mov	ax,(bx)
+	inc	bx
+	inc	bx
+	mov	(KBD_BUF_HEAD),bx
+	cmp	bx,(KBD_BUF_END)
+	jne	int_16_ret
+	mov	bx,(KBD_BUF_START)
+	mov	(KBD_BUF_HEAD),bx
+	jmp	int_16_ret
+
+read_stat:
+	mov	bx,(KBD_BUF_HEAD)
+	cmp	bx,(KBD_BUF_TAIL)
+	mov	ax,(bx)
+	pop	bx
+	pop	ds
+	sti
+	retf	#2
+
+read_shift:
+	mov	ax,(KBD_FLAGS)
+	jmp	int_16_ret
+
+write_kbd:
+	push	di
+	mov	bx,(KBD_BUF_TAIL)
+	mov	di,bx
+	inc	bx
+	inc	bx
+	cmp	bx,(KBD_BUF_END)
+	jne	wk_noend
+	mov	bx,(KBD_BUF_START)
+wk_noend:
+	cmp	bx,(KBD_BUF_HEAD)
+	je	wk_noend
+	mov	(di),ax
+	mov	(KBD_BUF_TAIL),bx
+wk_end:
+	pop	di
+	jmp	int_16_ret

@@ -1,0 +1,16 @@
+
+This technical manual describes in some detail the implementation of
+our project, a simple operating system to provide multiple virtual
+machines for a PC style computer. We have exercised our judgement in
+deciding how detailed this description is. Our aim was that this manual
+should present the reader with all the information they need to be able
+to implement extensions to the system, whatever possible form these
+extensions may be in (i.e. shell commands, new modules, etc@dots{}).
+
+To achieve this aim our main preoccupation has been to describe the
+@emph{interface} between the parts of the systems, normally this means
+documenting the functions that each module exports. Obviously this is
+no good without additional explanation of how each part of the system
+actually works; hopefully we have found a good balance between
+swamping the reader with unnecessary implementation details and telling
+them what they need to know to program in the system.

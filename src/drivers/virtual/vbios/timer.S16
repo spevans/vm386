@@ -1,0 +1,54 @@
+/* timer.S16 -- Timer VBIOS functions.
+   John Harper. */
+
+/* -- added support to handle VCMOS interrupt (for alarm)
+   Simon Evans. */
+
+#define __ASM__
+#include <vmm/vbios.h>
+
+	.globl	int_8, irq_8
+int_8:
+	push	ds
+	push	eax
+	mov	ax,#0x40
+	mov	ds,ax
+	mov	eax,(TIMER_COUNTER)
+	inc	eax
+	cmp	eax,#0x17fe80		/* Ticks in one day */
+	jb	no_wrap
+	xor	eax,eax
+	mov	byte ptr (TIMER_OVERFLOW),#1
+no_wrap:
+	mov	(TIMER_COUNTER),eax
+	int	0x1c
+	mov	al,#0x20
+	out	0x20,al
+	pop	eax
+	pop	ds
+	iret
+
+irq_8:
+	push	ax
+	push	dx
+        push	es
+	mov 	ax,#0xb800
+ 	mov	es,ax
+	seg	es
+	mov	[0], #0x4141
+	mov	dx,#0x70
+	mov	al,#0xC
+	out	dx,al
+	mov	dx,#0x71
+	in	al,dx
+	and	al,#0x20
+	jz	noalarm
+	int	#0x4A
+noalarm:
+	mov	al,#0x20
+	out	#0xA0,al
+	out	#0x20,al
+	pop	es
+	pop	dx
+	pop	ax
+	iret

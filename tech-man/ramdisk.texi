@@ -1,0 +1,19 @@
+The ramdisk driver is in fact a very simple block driver, which
+represents a block of memory in a form usable by the filing system
+@pxref{Filing System} module.
+
+The ramdisk is designed to be able to mimic a floppy disk, and
+as such works on an internal block size of 512 bytes, which is
+mapped from the filing system's present block size of 1024 bytes.
+
+@deftypefn {ramdisk Function} {rd_dev_t *} create_ramdisk (u_long @var{blocks})
+This function is called to create a ramdisk device. In doing so,
+the relevant amount of memory is allocated and the filing system is
+instructed to prepare it as a file system, where it is subsequently
+mounted ready for use.  As it stands, a 1.4meg ramdisk is
+created at driver initialisation, also. Ramdisk devices are
+labelled @samp{rd0} where 0 is the number of the ramdisk.
+@end deftypefn
+
+The other functions inside the Ramdisk module are fairly standard
+Filing system and block device interface functions.

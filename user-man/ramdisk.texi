@@ -1,0 +1,34 @@
+The ramdisk is a simple means of utilising memory in a way accessible
+through the filing system.
+
+Once a suitable region of memory has been allocated for the purpose,
+a device becomes available for file storage, and any accesses to
+that device are reflected into the allocated memory. The devices 
+are numbered @samp{rd0} onwards, the numeric part representing the
+number of the device.
+
+Once the ramdisk device driver is loaded, management of the
+ramdisks is achieved with the commands listed below.
+
+@deffn {Command} rdinfo
+This command lists information on the allocated ramdisks present
+in the system, including their device name, the address of their
+memory regions and the size of the region.
+@end deffn
+
+@deffn {Command} addrd blocks
+This enables the user to add a ramdisk to the system of @var{blocks}
+blocks in size. A block is 512 bytes in size (unlike the file system,
+where a block is in fact 1024 bytes in size) and memory will be
+allocated for it, if possible. Once allocated, the area is initialised
+and mounted ready for use. Numbering of the ramdisk is incremental from
+the last created ramdisk, starting at zero.
+@end deffn
+
+@deffn {Command} delrd device
+Removes the device @var{device} from the system, making it unavailable
+for use. Any information stored on it is lost. In removing it from
+the driver, the device is unmounted and the memory it was using
+is returned returned to the system.
+@end deffn
+

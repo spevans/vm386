@@ -1,0 +1,154 @@
+
+This is a quick intro to the syntax of Texinfo.
+
+
+Basics
+******
+
+Firstly, all Texinfo commands are an `@' sign followed by the name of
+the command. If the command is one that goes in the middle of a block
+of a text it's followed by a set of curly-brackets containing the
+arguments to the command.
+
+For example to change the font of a piece of text, use:
+
+	@code{foo}		-- Mark `foo' as a piece of code, i.e. a
+				   function name.
+	@var{bar}		-- Mark `bar' as a pseudo-variable, i.e.
+				   an argument to a function definition.
+	@file{baz}		-- `baz' is the name of a file.
+	@emph{something}	-- Emphasize `something' (in italics)
+	@strong{x}		-- Emphasize it more (in bold)
+
+Commands which can only come between sections of text (at the start of a
+line) don't get any curly brackets. Examples are,
+
+@example
+Some text that will be printed in a fixed width font. It won't get
+filled. Use this construct to include bits of code.
+@end example
+
+Oh yeah, the `@end FOO' command is used all over the place to end
+a block.
+
+Also, don't put *any* TAB characters in .texi files, TeX doesn't like
+them apparently.
+
+
+Structure
+*********
+
+The structure of the document is done by the commands `@chapter NAME',
+`@section NAME', `@subsection NAME' and `@subsubsection NAME'. They have
+to go at the beginning of the line.
+
+Generally wherever you put one of the above structuring commands you also
+put an `@node' command. This is only used in Hypertext docs and starts
+a new node. It all looks something like:
+
+@node THIS-NODE, NEXT-NODE, PREVIOUS-NODE, PARENT-NODE
+@section THIS-CHAPTER
+
+`THIS-NODE' and `THIS-CHAPTER' are usually similar, if not the same.
+
+
+Menus
+*****
+
+Menus are used in the Hypertext versions of the document to link nodes
+together. Generally each node with child nodes has a menu allowing you
+to reach the kids. For example:
+
+@menu
+* Child node 1::
+* Child node 2::
+...
+@end menu
+
+Note that the `* ' at the start and the `::' at the end is compulsory.
+When a printed manual is created menus are ignored.
+
+
+Lists
+*****
+
+Lists get you vertical sequences of paragraphs. They look something like,
+
+@itemize @bullet
+@item
+FIRST-PARAGRAPH
+
+@item
+NEXT-PARAGRAPH
+...
+@end itemize
+
+If you want numbered lists, use `@enumerate', i.e.
+
+@enumerate
+@item
+FIRST-PARA
+
+@item
+SECOND-PARA
+...
+@end enumerate
+
+
+Documenting functions
+*********************
+
+Special commands exist to format the documentation for functions, it looks
+something like:
+
+@deftypefun RETURN-TYPE FUNC-NAME ARGUMENTS
+...
+@end deftypefun
+
+For example:
+
+@deftypefun int twibble (int @var{foo}, int @var{bar})
+This function takes two arguments, @var{foo} and @var{bar}, twibbles them,
+and returns the result.
+@end deftypefun
+
+would produce output like,
+
+-- Function: int twibble (int FOO, int BAR)
+...
+
+It also adds an entry to the index of functions.
+
+
+Indices
+*******
+
+Two indices are used, the `concept index' for general topics and the `function
+index' for functions and variables. Two commands exist to add entries to
+these indexes:
+
+@cindex INDEX-ENTRY
+@findex FUNCTION-NAME
+
+Note that the `@deftypefun' command automatically creates a new entry in the
+function index.
+
+
+Footnotes
+*********
+
+Include footnotes in paragraphs with the command `@footnote{FOOTNOTE-TEXT]'.
+
+
+Comments
+********
+
+are introduced by the command `@c' at the beginning of a line.
+
+
+---------
+
+I can't think of anything else important.. have a look at the skeleton manual
+I've made in the `*.texi' files.
+
+john

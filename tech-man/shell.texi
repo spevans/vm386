@@ -1,0 +1,284 @@
+
+The shell is the system's user interface, it is a very simple command
+line based shell. The set of commands recognised by the shell's parser
+is dynamically extendable: other parts of the system are able to
+register commands they have implemented with the shell.
+
+The shell is stored in the module @samp{shell}, all functions and
+variables documented in this chapter are found in this module. The
+module structure is defined in the shell's header file:
+@file{<vmm/shell.h>}.
+
+@menu
+* Shell Basics::
+* Online Help::
+* New Commands::
+* Kernel Shell Commands::
+* Shell Output::
+@end menu
+
+@node Shell Basics, Online Help, , Shell
+@section Basics
+@cindex Shell basics
+
+Each shell uses a tty to give it a virtual display and a logical
+keyboard (@pxref{TTY Driver}). The shell created when the system is
+initialised is called the @dfn{system shell}, all output from the
+kernel's @code{printf} functions is written to the display of this
+shell. The hot key @kbd{Alt-@key{SysReq}} can be used to switch to
+this display.
+
+The shell reads its input one line at a time, either from its tty or
+the file being executed if the shell is currently parsing a shell
+script. Once a whole line has been read it is split into words, each
+of which is separated by a sequence of white space characters (either
+spaces or tabs). To create a word which contains spaces it can be
+bracketed by two single-quote (@samp{'}) characters. If the first
+non-white space character in a line is a hash character (@samp{#}) the
+line is treated as a comment and ignored. 
+
+After tokenising its input line the shell uses the first word in the
+line to identify the command being invoked. It uses this word to
+search the hash table of available commands, if one matches the
+function associated with this command is called with the remaining
+words in the command line as its parameters.
+
+@dfn{Shell scripts} are files containing shell command lines, the
+@code{source} shell command is used to execute a named shell script.
+The commands in a shell script are executed in order just as though
+they had been typed at a tty (except no prompt string is printed).
+
+The system is not restricted to only one shell; the @code{shell} shell
+command and the hot key @kbd{Alt-@key{ESC}} both create a new shell
+process, running in a new tty.
+
+@node Online Help, New Commands, Shell Basics, Shell
+@section Online Help
+@cindex Online help
+@cindex Shell, online help
+
+To help the user of the system the shell and its commands provide a
+simple online help system. When each command is registered a short
+string documenting the command must be provided along with the pointer
+to the function implementing the command. The @code{help} shell
+command then uses these strings to provide short pieces of help
+information.
+
+@deffn {Shell Command} help [command-name]
+This command implements the shell's online help system. Invoking the
+command with no parameter prints a list of the available commands to
+the shell's display.
+
+When given the @var{command-name} parameter names a command, its
+documentation string is searched for and if it exists it will be
+printed to the display.
+@end deffn
+
+@node New Commands, Kernel Shell Commands, Online Help, Shell
+@section Adding New Commands
+@cindex Adding shell commands
+@cindex Shell, adding commands
+
+Each shell command is implemented by a C function. When the command is
+invoked its function is called with three arguments, a structure
+defining which shell the command was invoked by, the number of
+parameters to the command and an array of string pointers defining the
+arguments themselves. The function should return an integer defining
+the result of the command: zero for success, various non-zero values
+for different types of errors. The shell structure looks like this:
+
+@example
+struct shell @{
+    /* The task the shell is running on. */
+    struct task *task;
+
+    /* The shell's tty device. */
+    struct tty *tty;
+
+    /* If non-null a shell script is being
+       executed from this file. */
+    struct file *src;
+
+    /* A pointer to the shell module, this
+       saves commands opening the shell
+       explicitly. */
+    struct shell_module *shell;
+
+    /* The result of the last command executed. */
+    int last_rc;
+
+    /* The current prompt. */
+#define PROMPT_SIZE 40
+    char prompt[PROMPT_SIZE];
+@};
+@end example
+
+@deftypefn {shell Function} void add_command (const char *@var{name}, int (*@var{func})(struct shell *sh, int argc, char **argv), const char *@var{doc})
+This function adds the command named @var{name}, implemented by the
+function @var{func} and with documentation string @var{doc}, to the
+shell's hash table of available commands.
+
+The function @var{func} is called with the shell structure, the
+number of arguments and an array of arguments. It should return an
+integer defining its result, zero means success. Predefined result
+values are:
+
+@vtable @code
+@item RC_OK
+The function succeeded.
+
+@item RC_WARN
+It failed, but not catastrophically.
+
+@item RC_FAIL
+Total failure.
+
+@item RC_QUIT_NOW
+The shell will quit if a command returns this value.
+@end vtable
+
+The following example function could be used to implement a shell
+command:
+
+@example
+int
+cmd_foo(struct shell *sh, int argc, char **argv)
+@{
+    if(argc == 0)
+    @{
+        sh->shell->printf(sh, "error: no argument\n");
+        return RC_WARN;
+    @}
+    sh->shell->printf(sh, "first arg: %s\n", argv[0]);
+    return RC_OK;
+@}
+@end example
+@end deftypefn
+
+@deftypefn {shell Function} bool remove_command (const char *@var{name})
+Removes the command called @var{name} from the hash table of commands.
+If no such command exists @code{FALSE} is returned, otherwise
+@code{TRUE}.
+@end deftypefn
+
+Many modules implement more than one shell command, to save having to
+call @code{add_command} more than once special functions are provided
+to add a list of commands in one go. Each list of shell commands is
+stored in a special structure:
+
+@example
+struct shell_cmds @{
+    /* Used by the kernel shell functions. */
+    struct shell_cmds *next;
+
+    /* An array defining the commands to add. */
+    struct @{
+        const char *name;
+        int (*func)(struct shell *, int, char **);
+        const char *doc;
+    @} cmds[0];
+@};
+@end example
+
+@noindent
+@findex END_CMD
+@findex CMD
+The last entry in the array should be three zeros to act as a
+sentinel, the macro @code{END_CMD} can be used to define such an entry.
+Another useful macro is @code{CMD}, this expands to an entry in an
+array of commands from its single argument defining the name of the
+command. It depends on the command's function being the string
+@samp{cmd_} followed by the name of the command, and the command's
+documentation being a macro called @samp{DOC_} followed by the name of
+the command. So an example list of commands could be:
+
+@example
+struct shell_cmds shell_cmds = @{
+    0, @{ CMD(echo), CMD(prompt), CMD(help), CMD(quit), CMD(cls),
+         CMD(shell), CMD(source), CMD(ed), END_CMD @}
+@};
+@end example
+
+@deftypefn {shell Function} void add_cmd_list (struct shell_cmds *@var{cmds})
+Add the shell commands defined by the list @var{cmds} to the shell.
+
+Note that it's usually easier to call the function @code{add_shell_cmds}
+defined by the kernel. @xref{Kernel Shell Commands}.
+@end deftypefn
+
+@deftypefn {shell Function} void remove_cmd_list (struct shell_cmds *@var{cmds})
+Remove each command in the list of commands @var{cmds} from the shell.
+@end deftypefn
+
+@node Kernel Shell Commands, Shell Output, New Commands, Shell
+@section Adding Commands With The Kernel
+@cindex Adding commands with the kernel
+@cindex Shell, kernel commands
+
+Due to the modular design of the system, each module that implements
+shell commands usually registers them when the module is initialised.
+This can cause problems: some modules are loaded before the shell ---
+therefore there's no way for them to add their commands.
+
+To solve this problem we decided to implement a delayed-registration
+function. This is part of the kernel, when called with a list of shell
+commands it guarantees to register them with the system's shell
+module. If the shell hasn't yet been loaded the commands are simply
+added to the list of commands waiting to be registered, otherwise they
+are immediately added to the shell. When the shell is loaded it calls
+a kernel function to collect the commands waiting to be registered.
+
+Another advantage of this method is that module's implementing shell
+commands don't even need to open the shell module: they use the kernel
+to add their commands. When one of their commands is invoked it can
+use the pointer to the shell module stored in the shell structure.
+
+All functions defined in this section are part of the kernel module.
+@xref{Kernel}.
+
+@deftypefn {kernel Function} void add_shell_cmds (struct shell_cmds *@var{cmds})
+Add the list of shell commands @var{cmds} to the shell as soon as is
+possible. This is the recommended method of adding commands to the
+shell.
+
+Note that the only possible way to remove commands added to the shell
+by this function is with the @code{remove_shell_cmds} function
+described below.
+@end deftypefn
+
+@deftypefn {kernel Function} void remove_shell_cmds (struct shell_cmds *@var{cmds})
+Remove the list of shell commands added to the shell by the
+@code{add_shell_cmds} function.
+@end deftypefn
+
+@deftypefn {kernel Function} void collect_shell_cmds (void)
+This function should be called by the shell after it has initialised
+itself. Each list of commands waiting to be installed into the shell
+(from the @code{add_shell_cmds} function) is applied to the shell
+module's @code{add_cmd_list} function.
+@end deftypefn
+
+@node Shell Output, , Kernel Shell Commands, Shell
+@section Output
+@cindex Shell output
+@cindex Output from shells
+
+@deftypefn {shell Function} void print (struct shell *@var{sh}, const char *@var{text}, size_t @var{length})
+Print @var{length} characters of the string @var{text} to the tty of
+the shell represented by the structure @var{sh}.
+@end deftypefn
+
+@deftypefn {shell Function} void printf (struct shell *@var{sh}, const char *@var{fmt}, ...)
+Print a formatted string to the tty of the shell @var{sh}. This string
+is formatted by the kernel function @var{vsprintf} using the @var{fmt}
+parameter and any other parameters given to this function.
+@end deftypefn
+
+@deftypefn {shell Function} void perror (struct shell *@var{sh}, const char *@var{msg})
+This function prints an error message to the tty of the shell @var{sh}.
+If the @var{msg} parameter is not a null pointer the string that it
+points to is printed, followed by a colon and text describing the
+contents of the current task's @code{errno} field. If @var{msg} is a
+null pointer only the message describing @code{errno} is printed.
+@xref{Error Codes}.
+@end deftypefn

@@ -1,0 +1,216 @@
+
+@c This chapter documents the system's loader and initialisation process
+
+This is the process that gains control when the machine is first booted
+up and continues up until the kernel gains control. It has to perform
+the startup functions required of any standard operating machine.
+
+@menu
+* Boot Loader::
+* System Check::
+* Loading the Kernel::
+* Setting Hardware to a known state::
+* Setting up page tables::
+* Setting up descriptor tables::
+* Entering Protected Mode::
+* 32-bit Setup::
+@end menu
+
+@node Boot Loader, System Check, , Initialisation
+@section Boot Loader
+@cindex Boot loader
+@cindex Startup
+
+The Boot loader is the first part of the system to be executed. When it is
+loaded, it initially checks to see if the disk is marked as a system disk.
+If not, it prints a message onto the screen telling the user this and asking
+him to reboot.
+If the disk is found to be a system disk, then the boot media byte is retrieved 
+from the boot sector and this is then used to determine the characteristics
+of the boot media.
+
+@subsection Determining Media Characteristics
+The aim of this process is to determine the number of heads, cylinders and
+sectors on the boot media. There are two methods used to achieve this depending
+on whether the media is a floppy disk or a hard disk.
+
+@subsubsection Hard Disk Media
+This can be determined by simply making a call to the BIOS with the appropriate
+hard disk number. This returns to maximum heads, cylinders and sectors
+available on the media.
+
+@subsubsection Floppy Disk Media
+This requires a different strategy because using the call to the BIOS will
+only reveal the characteristics of the disk drive and not the disk inside it.
+Therefore the media is found using a combination of probing and fixed values.
+The number of heads is set at 2 since all floppy disk drives only have two
+heads. Since the information about the number of cylinders on a disk is not
+used this is set at 80. This is a reasonable default since floppy disks only
+have 40 or 80 tracks, with 40 only being found on older disk systems. The
+final stage is to probe the disk for the number of sectors per track. This
+is done by having a list of the possible values for this number and then
+trying to read the maximum sector off of each track. For example if the test
+is probing for 18 sectors per track, then an attempt is made to read sector
+18. If it passes this is taken as the value to use otherwise the next number
+in the list is tested. The list must be in descending order for this to work.
+
+@subsection Loading The Loader
+Because the boot sector only allows for 512 bytes of code and data, it
+is just enough to load up a more complicated program to initialise the system
+and load the kernel. The boot sector loads this program up into the high
+end of conventional memory and then passes execution to it.
+
+@node System Check, Loading the Kernel, Boot Loader, Initialisation
+@section System Check
+@cindex System check
+@cindex GROPE 
+@vindex cookie
+@tindex struct cookie
+
+The first thing done by the loader program is to perform a GROPE (General
+Reconnaissance of Peripheral Equipment) to determine the available hardware.
+The first step is to determine the model of CPU and FPU in the system and then
+find the standard hardware available in the machine which includes the memory,
+display, serial and parallel ports and the disk subsystem. The CPU is also
+examined to see what operating mode it is running in. The information found
+by the hardware search is written into the @code{cookie} structure to be later
+accessed by the kernel. 
+
+@node Loading the Kernel, Setting Hardware to a known state, System Check, Initialisation
+@section Loading The Kernel
+@cindex Loading the kernel
+@cindex A20
+@cindex PIC
+@cindex NMI
+
+If the system check determines that an 80386 or greater processor is available 
+and it is operating in Real Mode then execution can continue. At this point it 
+should be noted that all code executed prior to this stage is written to execute
+on any Intel processor from the 8088 upwards. If an incompatible processor is
+detected then a message informing the user of this is displayed and the machine
+halted.
+The kernel is located on the disk by means of information present in the 
+boot sector and is loaded to a known location by the kernel loader.
+
+@node Setting Hardware to a known state, Setting up page tables, Loading the Kernel, Initialisation
+@section Setting Hardware To A Known State
+@cindex Setting hardware to a known state
+
+Once the kernel is loaded, the hardware is setup to a known state so that
+there are no unexpected hardware problems for the kernel. The following
+hardware was set to a known state:
+
+@itemize @bullet
+@item
+The floppy disk system had its motors turned off.
+
+@item
+The Non-Maskable Interrupt (NMI) was disabled.
+
+@item
+The Peripheral Interrupt Controller (PIC) had all its interrupts masked
+off.
+
+@item
+External CPU interrupts were disabled.
+
+@item
+The Peripheral Interrupt Controller (PIC) had its interrupts re-mapped
+from 08-0f to 20-27 for the master PIC and from 70-77 to 28-2f for the slave PIC.
+This was required to avoid conflicts with CPU exceptions and to make them occupy
+a contiguous interrupt space.
+@end itemize
+
+@node Setting up page tables, Setting up descriptor tables, Setting Hardware to a known state, Initialisation
+@section Setting Up Page Tables
+@cindex Page tables, setting up
+@cindex CR3
+
+This is required for initial entry into Protected Mode with paging enabled.
+The Page directory is setup with the following entries:
+
+@itemize @bullet
+@item
+An identity mapping required until the jump to the correct logical
+address is completed.
+
+@item
+The actual mapping required by the kernel at runtime.
+@end itemize
+
+After this, the page tables for the kernel are setup, providing the mapping
+from its logical address to its physical address. A null entry is also
+added at logical address 0 to capture stray pointer references.
+@code{CR3} (Control Register 3) is then loaded with the physical
+address of the Page Directory
+
+@node Setting up descriptor tables, Entering Protected Mode, Setting up page tables, Initialisation
+@section Setting Up Descriptor Tables
+@cindex Descriptor tables, setting up
+@cindex GDT
+@cindex IDT
+
+The GDT (Global Descriptor Table) and IDT (Interrupt Descriptor Table)
+are staticly allocated so the appropriate descriptor table register are loaded
+with pointers to these tables.
+
+@node Entering Protected Mode, 32-bit Setup, Setting up descriptor tables, Initialisation
+@section Entering Protected Mode
+@cindex Protected mode, entering
+@cindex CR0
+
+The final part of the 16bit initialisation if the transition from 16-bit Real 
+Mode to 32-bit Protected Mode. This is accomplished by setting bits 0 and 31 
+to 1 in @code{CR0} (Control Register 0). Immediately after this a far jump is 
+performed to the kernel's 32-bit entry point. This far jump is required to
+flush the prefetch queue of the processor because instructions in this queue
+would have been decoded as 16-bit instructions and could have be fetched from
+the wrong address because the processor was not using the paging system at
+the time. At this point the processor enters a flat-model 32-bit protected
+mode operating state.
+
+@node 32-bit Setup, , Entering Protected Mode, Initialisation
+@section 32-bit Setup
+@cindex Setup, 32-bit
+@cindex GDT
+@cindex LDT
+@cindex IDT
+@cindex CR3
+
+The 32-bit setup provides the `glue' between the 16-bit initialisation and
+the call to the kernel's @code{main} function. The action taken by this setup
+is as follows:
+
+@itemize @bullet
+@item
+The segment registers @code{DS}, @code{ES}, @code{FS}, @code{GS} and
+@code{SS} are set to point to the kernel data selector.
+
+@item
+The @code{ESP} (stack pointer) is set to point to a valid stack area.
+
+@item
+The GDT and IDT are reloaded to obtain their full 32-bit values because
+loading them in 16-bit mode only loads the low 24-bits of their values.
+
+@item
+The LDT (Local Descriptor Table) register is loaded with 0 to indicate
+that any local descriptor accesses should be trapped. Local Descriptor Tables
+are not used in this operating system.
+
+@item
+The identity page mapping used by the kernel for its transition from 16-bit
+to 32-bit mode is now removed and @code{CR3} reloaded with the Page
+Directory to flush the TLB (Translation Lookaside Buffer).
+
+@item
+The BSS is cleared to zero so that any uninitialised global variables in
+the code are set to 0.
+
+@item
+The IDT is set to cause all interrupts to point to a valid function.
+
+@item
+The kernel's @code{main} function is called and execution of the C portion
+of the kernel starts.
+@end itemize

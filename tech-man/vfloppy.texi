@@ -1,0 +1,59 @@
+The @samp{vfloppy} driver provides an interface that mimics floppy
+drives under a virtual machine. It presently only provides support
+for accesses performed under BIOS control, using the INT 13H
+interface. Most applications will only use this interface rather
+than attempt to access the floppy at the I/O port level.
+
+During the installation of the Virtual Floppy device, with the
+@code{vmvxd} shell command, the driver requires a single parameter
+thus:
+
+@example
+@var{image}
+@end example
+
+@noindent
+The @var{image} argument is either the name of a floppy device,
+followed by a colon (i.e. @samp{fd0:}, @samp{fd1:}, @dots{}) or the
+name of a file. Presently, support is only given for linkage
+to a file.
+
+The header file @file{<vmm/vfloppy.h>} defines the Virtual Floppy
+module. The functions that it provides (as well as the standard
+virtual device creation function) are as follows.
+
+@deftypefn {vfloppy Function} void kill_vfloppy (struct vm *@var{vm})
+Remove the Virtual Floppy device from the virtual machine
+specified by @var{vm}.
+@end deftypefn
+
+@deftypefn {vfloppy Function} bool change_vfloppy (struct vm *@var{vm}, const char *@var{new_file})
+If the Virtual Floppy has not already been linked to a file or
+device, then this function will do so, linking the driver
+with the file specified in @var{new_file} in virtual machine
+@var{vm}. If the driver is already linked to a file, then this
+function will close the existing link and relink to the newly
+specified file.
+@end deftypefn
+
+@deftypefn {vfloppy Function} int vfloppy_read_sectors (struct vm *@var{vm}, u_int @var{drvno}, u_int @var{head}, u_int @var{track}, u_int @var{sector}, int @var{count}, void *@var{buf})
+This function reads @var{count} 512-byte sized sectors from the Virtual
+Floppy device of the virtual machine @var{vm} to the buffer @var{buf}, a
+logical address in @emph{user} space. The sectors will be read from the
+sector on the virtual disk defined by @var{cyl}, @var{head} and
+@var{sector} on the disk numbered @var{drvno} (this must be zero since
+only one virtual disk is supported by the controller).
+
+The value returned is either the number of blocks successfully read
+or -1 to denote an error before any blocks could be read.
+@end deftypefn
+
+@deftypefn {vfloppy Function} bool vfloppy_get_status (struct vm *@var{vm}, u_char *@var{statp}, u_char *@var{errp})
+If the virtual machine @var{vm} has a Virtual Floppy installed
+in it, the contents of the locations @var{statp} and @var{errp} are set
+to the values of the controller's status and error registers
+respectively, then the value @code{TRUE} is returned. Otherwise, when
+no Virtual Floppy is installed the value @code{FALSE} is
+returned and @var{statp} and @var{errp} left unmodified.
+@end deftypefn
+

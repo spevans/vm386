@@ -1,0 +1,33 @@
+The @code{vfloppy} Virtual Device driver provides BIOS level support
+for a single floppy drive in a virtual machine.
+
+The virtualisation presently allows for the user to start a
+machine with a floppy drive mapped to a specified file. All access
+to that file will be converted to references into that file, the
+file normally being the image of a physical disk.
+
+Use the @code{vmvxd} command (@pxref{Launching VMs}) to install the
+@code{vfloppy} virtual device into the current virtual machine
+context. The command format is:
+
+@example
+vmvxd vfloppy [@var{file}]
+@end example
+
+It opens the file @var{file} and all access in the virtual
+machine, via the BIOS, to the floppy drive will be mirrored in the
+specified file.
+
+If @var{file} isn't specified, the device will be added to the
+virtual machine, but it won't open any file. The file can later
+be specified with the @code{vdisk} command.
+
+@deffn {Command} vdisk pid [file]
+The @code{vdisk} command specifies the file to which all floppy
+disk access in the virtual machine @var{pid} will be mirrored into.
+
+If no @var{file} is specified, then any currently open file is
+closed. If a file was already open, then it is closed prior
+to opening of the specified file.
+@end deffn
+

@@ -1,0 +1,11 @@
+The floppy driver provides support for up to two floppy drives, numbered
+@samp{fd0} and @samp{fd1}. The geometry of these drives is obtained from the
+CMOS information of the machine.
+
+@deffn {Command} fdinfo
+Lists the floppy devices that floppy driver is supporting. This is
+the information obtained from the kernel, and if mounted, the information
+of the physical disks.
+@end deffn
+
+To mount a floppy drive for use by the filing system, see @ref{FS Devices}.

@@ -1,0 +1,245 @@
+@c This chapter documents the System Message Log Daemon (syslogd)
+
+@menu
+* Log Daemon Introduction::
+* Log Daemon Operation::
+* Log Daemon Functions::
+@end menu
+
+@node Log Daemon Introduction, Log Daemon Operation, , System Log Daemon
+@section Introduction
+@cindex Log daemon, introduction
+@cindex Syslogd, introduction
+
+The System Message Log Daemon (syslogd) allows logging of messages from the
+kernel and other modules to go to a system log file. It allows different
+levels of logging and the ability to start and stop message logging altogether.
+Modules can open private handles to the log daemon to allow them to write
+debugging, status and any other information they want to the logfile. The level
+of message logging can also be set to avoid producing a log file that gets
+too big with normal usage of the operating system whilst allowing all needed
+information to be logged when the operating system and its modules are being
+debugged.
+The spool file is defined in the header @file{<vmm/syslogd.h>} and is
+by default set to @file{/adm/syslog}.
+
+@node Log Daemon Operation, Log Daemon Functions, Log Daemon Introduction, System Log Daemon
+@section Operation
+@cindex Log daemon, operation 
+@cindex Syslogd, operation 
+
+Upon initialisation, syslogd creates a thread to handle the operation of
+writing the log messages to the log file. This is done for two reasons:
+
+@itemize @bullet
+@item
+It stops modules which are using the log facility from slowing down
+whilst their information is written to the file.
+
+@item
+It allows interrupt and exception handlers to log messages because the
+thread which is writing to the disk is running in a different context. If this
+were not done, interrupt and exception handlers would not be able to log
+messages.
+@end itemize
+
+Messages are added to the log file by the functions @code{syslogd_entry}
+and @code{syslogd_cooked_entry}. These messages are then added into a circular
+buffer, the contents of this buffer being written to the log file by the thread
+previously created. This situation of two threads accessing a circular buffer
+is a classic of the `producer-consumer' relationship and simultaneous access
+to the circular buffer is prevented by the use of a semaphore.
+
+Messages are only entered into the circular buffer if two conditions are 
+fulfilled:
+
+@itemize @bullet
+@item
+Logging is currently enabled and,
+
+@item
+The level of the message if less than or equal to the current logging
+level.
+@end itemize
+
+@node Log Daemon Functions, ,  Log Daemon Operation, System Log Daemon
+@section Functions 
+@cindex Log daemon, functions 
+@cindex Syslogd, functions
+
+@subsection Opening The Log
+@cindex Log daemon, opening
+@cindex Syslogd, opening
+
+Before a program can write to the logfile, it must open it to gain a handle
+to write to.
+
+@deftypefn {syslogd Function} int open_syslog (char *@var{name}, u_int @var{level})
+This function gives a process access to the log.
+
+@var{name} is a string of maximum length 16 characters used as an identifier
+in the log output.
+
+@var{level} is the logging level at which this output is written to the log.
+
+This function returns -1 on error or the handle used for access. 
+@end deftypefn
+
+@subsection Closing The Log
+@cindex Log daemon, closing
+@cindex Syslogd, closing
+
+When a program has finished with the logfile, it should close it to free up
+its handle.
+
+@deftypefn {syslogd Function} void close_syslog (int @var{handle})
+This function closes and frees access to the logfile.
+
+@var{handle} is the handle returned by @code{open_syslog}.
+
+This function returns nothing.
+@end deftypefn
+
+Once a program has gained a handle, it can then write its entries to the
+logfile using one of the following two functions.
+
+@subsection Writing To The Log
+@cindex Log daemon, writing
+@cindex Syslogd, writing
+
+@deftypefn {syslogd Function} void syslog_entry (int @var{handle}, char *@var{entry})
+Adds a string to the logfile. The string is time-stamped and preceded by the 
+identification string given when the logfile was opened.
+
+@var{handle} is the handle returned by @code{open_syslog}.
+
+@var{entry} is the string to add.
+
+This function returns nothing.
+@end deftypefn
+
+@deftypefn {syslogd Function} void syslog_cooked_entry (int @var{handle}, char *@var{entry})
+Adds a string to the logfile. No other information is added to the string.
+This is used for putting preformatted data into the logfile and is primarily
+used by the kernel's @code{printk} function for writing its internal buffer to
+the logfile.
+
+@var{handle} is the handle returned by @code{open_syslog}.
+
+@var{entry} is the string to add.
+
+This function returns nothing.
+@end deftypefn
+
+@subsection Controlling The Logging
+@cindex Log daemon, starting
+@cindex Syslogd, starting
+@cindex Log daemon, stopping
+@cindex Syslogd, stopping
+@cindex Log daemon, logging level
+@cindex Syslogd, logging level
+
+The action of the Log Daemon can be controlled in two ways:
+
+@itemize @bullet
+@item
+Disabling or enabling logging entirely and,
+
+@item
+Setting the logging level.
+@end itemize
+
+@deftypefn {syslogd Function} void syslog_start (void)
+This function enables logging to start. If logging is not enabled no messages
+will be written to the logfile.
+
+This function returns nothing.
+@end deftypefn
+
+@deftypefn {syslogd Function} void syslog_stop (void)
+This function disables logging. No messages can be written to the logfile.
+
+This function returns nothing.
+@end deftypefn
+
+@deftypefn {syslogd Function} void set_syslog_level (u_int @var{level})
+This function sets the current logging level.
+
+@var{level} is the new logging level.
+
+This function returns nothing.
+@end deftypefn
+
+@subsection Status Of The Log Daemon
+@cindex Log daemon, status
+@cindex Syslogd, status
+@tindex struct syslog_status
+
+A program can gain information about the Log Daemon to find out how many
+messages and characters have been written, whether logging is enabled and
+the current logging level.
+
+@deftypefn {syslogd Function} void syslog_status (struct syslog_status *@var{status})
+Obtain status information about the current state of the Log Daemon.
+
+@var{status} is filled with information about the state of the Log Daemon.
+
+This function returns nothing.
+@end deftypefn
+
+@subsection Example Function Usage
+
+To access the log file use a piece of code something like the following.
+
+@example
+#include <vmm/syslogd.h>
+
+@dots{}
+
+int handle;
+
+/* open the syslog with an identifier of `name' and level
+   2 logging */
+if((handle = syslogd->open_syslog("name", 2)) != -1) @{
+
+    /* function succeeded */
+    syslogd->syslog_entry(handle, "log entry");
+
+    /* add a string which will not be time stamped or
+       identified */
+    syslogd->syslog_cooked_entry(handle, "direct entry");
+    syslogd->close_syslogd(handle);
+
+@} else @{
+
+    /* function failed */
+    @dots{}
+
+@}
+@end example
+
+To get the status of the log daemon and control its operation, use the
+@code{syslog_status}, @code{syslog_start}, @code{syslog_stop} and
+@code{set_syslog_level} functions.
+
+@example
+#include <vmm/syslogd.h>
+
+@dots{}
+
+/* get the status of the log daemon, increase the logging level
+   by 1 and toggle its operational state. */
+struct syslog_status status;
+
+/* get the status */
+syslogd->syslog_status(&status);
+
+/* increase the logging level */
+syslogd->set_syslog_level(status.log_level + 1);
+
+/* toggle the operation of the daemon */
+if(status.enabled == TRUE)
+    syslogd->syslog_stop();
+else
+    syslogd->syslog_start();
+@end example

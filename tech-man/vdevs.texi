@@ -1,0 +1,1364 @@
+
+This chapter documents the virtual devices. Each virtual device provides
+a virtualisation of one of the system's resources. All devices
+which a virtual machine wishes to address (including the CPU) must be
+emulated by a virtual device.
+
+@menu
+* Virtual Machines::
+* Virtual Device Structure::
+* Launching VMs::
+
+* Virtual PIC::
+* Virtual PIT::
+* Virtual DMA::
+* Virtual BIOS::
+* Virtual CMOS::
+* Virtual Floppy::
+* Virtual IDE::
+* Virtual Keyboard::
+* Virtual Printer::
+@end menu
+
+@node Virtual Machines, Virtual Device Structure, , Virtual Devices
+@section Virtual Machines
+@cindex Virtual machines
+
+A @dfn{virtual machine} is a special type of task (@pxref{Task Handling})
+used to virtualise (emulate) the functionality of a normal 8086
+processor.
+
+All functions described in this section of the manual are members of the
+@samp{vm} module, defined in the C header file @file{<vmm/vm.h>}.
+
+@menu
+* Virtual Machine Overview::
+* Creating Virtual Machines::
+
+* Virtual I/O Ports::
+* VM Slots::
+* VM Kill Handlers::
+* VM Fault Handling::
+* VM Arpl Handlers::
+* Virtual A20 Gate::
+@end menu
+
+@node Virtual Machine Overview, Creating Virtual Machines, , Virtual Machines
+@subsection Overview
+@cindex Virtual machines, overview
+
+Using the V86 mode of the 80386 the vm module creates and controls
+tasks which exactly resemble the environment of a standard 80x86
+processor running in real (16-bit) mode. Since each virtual machine is
+built on top of a standard system task multiple virtual machines may
+be running simultaneously using the standard system scheduling
+primitives.
+
+Although V86 mode allows the processor to run 16-bit code in a
+protected mode environment there is still a lot of the standard
+environment to be virtualised by hand. For example, since it is not
+safe to let virtual machines adjust the physical interrupt-mask flag
+in the @code{FLAGS} register all access to this register has to be
+trapped and emulated using a virtual copy of the register.
+
+It is not possible to let the virtual machines use the host system's
+physical hardware either since the operating systems running in the
+virtual machines would assume that they were the sole users of the
+hardware devices. This means that @emph{every} hardware device has to
+be virtualised; this basically means trapping all I/O port access,
+redirecting it to the necessary virtual device which will then emulate
+the I/O operation.
+
+All virtual machines are given a standard set of virtual hardware when
+they are created. This includes a tty to provide a virtual video
+adaptor and virtual keyboard hardware (@pxref{TTY Driver}). Other
+virtual devices may be added afterwards through the use of a standard
+mechanism (@pxref{Virtual Device Structure}).
+
+Obviously all this emulation imposes a massive overhead on running
+systems in this way; unfortunately there is no way to avoid this and
+still maintain total system integrity. We believe that the overall
+effect (multiple virtual machines running side-by-side) is well worth
+the overheads incurred. Although we have attempted to make the system
+as fast as possible we have not gone to ridiculous lengths to achieve
+this, favouring total protection over speed in all cases.
+
+@node Creating Virtual Machines, Virtual I/O Ports, Virtual Machine Overview, Virtual Machines
+@subsection Creating Virtual Machines
+@cindex Creating virtual machines
+@cindex Virtual machines, creating
+
+Each virtual machine is represented by an instance of the following
+data structure:
+
+@tindex struct vm
+@example
+struct vm @{
+    /* The thread of execution running this VM. */
+    struct task *task;
+
+    /* Local I/O port handlers for this VM. */
+    struct io_handler *local_io;
+
+    /* This VM's tty. */
+    struct tty *tty;
+
+    /* The VM's virtual IF */
+    u_long virtual_eflags;
+
+    /* Functions to call when the VM is killed. */
+    struct vm_kill_handler *kill_list;
+
+    /* True if a HLT instruction happened and this VM
+       is suspended. */
+    bool hlted;
+
+    /* Is NMI enabled? */
+    bool nmi_sts;
+
+    /* Is A20 enabled? */
+    bool a20_state;
+
+    /* Storage for the virtual A20 stuff. */
+    u_long himem_ptes[16];
+
+    /* Per-VM storage pointers for virtual devices. */
+    void *slots[32];
+
+    /* Defines the hardware virtualised for this VM. */
+    struct cookie_jar hardware;
+@};
+@end example
+
+@vindex TASK_VM
+Each task that is being used to provide a virtual machine has its
+@code{TASK_VM} flag set and its @code{user_data} field set to point to
+its instance of the above structure.
+
+@deftypefn {vm Function} {struct vm *} create_vm (const char *@var{name}, u_long @var{virtual_mem}, const char *@var{display_type})
+This function creates a new virtual machine called @var{name} (this
+string is copied). @var{virtual_mem} defines the total amount of
+memory to give it in kilobytes, a value between 640 and 1024 will only
+result in 640K of available memory because of the special region
+starting at 640K.
+
+The parameter @var{display_type} is a string naming the type of
+virtual video adaptor the virtual machine should have. A tty is opened
+using this argument (@pxref{TTY Driver}).
+
+When the virtual machine begins executing it's @code{CS:IP} will be
+@code{FFFF:0}, its virtual interrupt-flag will be set to zero (i.e.
+interrupts masked) and its virtual A20 line will be disabled (i.e.
+address above one megabyte wrap around to zero).
+
+Note that the task will be suspended to allow other virtual devices to
+be added to the virtual machine before it is started. To begin
+execution use the kernel module's @code{wake_task} function.
+
+If this function is successful it will return a pointer to this
+virtual machines data structure, otherwise a null pointer will be
+returned.
+@end deftypefn
+
+@deftypefn {vm Function} void kill_vm (struct vm *@var{vm})
+This function stops the virtual machine @var{vm} from executing, calls
+all the kill handlers registered with the virtual machine
+(@pxref{VM Kill Handlers}), closes the virtual machine's tty and
+finally deletes the virtual machine's task and its structure.
+@end deftypefn
+
+@node Virtual I/O Ports, VM Slots, Creating Virtual Machines, Virtual Machines
+@subsection Virtual I/O Ports
+@cindex Virtual I/O ports
+@cindex Virtual machines, I/O ports
+@cindex I/O ports, virtual
+
+Almost all hardware devices in a PC use programmed I/O for their
+interface with the processor. Therefore virtual devices need to be
+able to virtualise all I/O port operations performed by virtual
+machines. Luckily the 80386 provides a means of doing this: all
+@code{IN} and @code{OUT} instructions can be made to trap, allowing
+the virtual machine's general protection fault handler to emulate I/O
+instructions.
+
+Each virtual device must register the I/O ports which it wishes to
+virtualise; there are two levels of registration: either globally
+throughout the system or locally to a single virtual machine. When the
+general protection fault handler decodes an I/O instruction, it finds
+the port being addressed and then looks for a handler for this port
+for the current virtual machine. First it checks the local handlers
+for the virtual machine, then if no handler has been found, it
+searches the list of global handlers.
+
+For each sequence of I/O ports that a virtual device wishes to
+virtualise it must create an instance of the following structure, fill
+in its fields as necessary and call the @code{add_io_handler} function
+to register it with the system.
+
+@tindex struct io_handler
+@example
+struct io_handler @{
+    struct io_handler *next;
+
+    /* The name of this handler. */
+    const char *name;
+
+    /* The first and last (inclusive) I/O ports which
+       this handler should trap. */
+    u_short low_port, high_port;
+
+    /* Functions to be called for read and write accesses of an I/O
+       port respectively. PORT is the I/O port being addressed, SIZE
+       defines the number of bytes (1, 2 or 4) being accessed. */
+    u_long (*in)(struct vm *vm, u_short port, int size);
+    void (*out)(struct vm *vm, u_short port, int size, u_long val);
+@};
+@end example
+
+@deftypefn {vm Function} void add_io_handler (struct vm *@var{local}, struct io_handler *@var{ioh})
+This function registers an I/O handler, @var{IOH}, with the system. If
+@var{local} is a non-null pointer it means that this I/O handler will
+be registered local to the virtual machine @var{local}. Otherwise the
+handler will be registered globally.
+
+Note that the structure pointed to by @var{ioh} must not be deleted or
+reused while it is still registered.
+@end deftypefn
+
+@deftypefn {vm Function} void remove_io_handler (struct vm *@var{local}, struct io_handler *@var{ioh})
+This function does the opposite of @code{add_io_handler} --- it
+removes the I/O handler @var{ioh} from the system. If @var{local} is
+non-null it defines the virtual machine to which the I/O handler was
+locally registered.
+@end deftypefn
+
+@deftypefn {vm Function} {struct io_handler *} get_io_handler (struct vm *@var{vm},u_short @var{port})
+This function attempts to locate an I/O handler for an access of the
+I/O port numbered @var{port} from the virtual machine @var{vm}.
+
+If a suitable handler is found a pointer to it is returned, otherwise
+the function returns a null pointer.
+@end deftypefn
+
+@node VM Slots, VM Kill Handlers, Virtual I/O Ports, Virtual Machines
+@subsection Slots
+@cindex Virtual machines, slots
+@cindex Slots in virtual machines
+
+Virtual devices usually have to store some per-virtual machine state
+information, there is no obvious way to do this efficiently without
+being able to edit the @code{struct vm} used to represent a virtual
+machine. Since one of our main objectives was to make the system
+dynamically extendable (i.e. @emph{without} having to recompile it
+all) this is simply not acceptable.
+
+To solve this problem we came up with the idea of reserving a certain
+amount of space in each virtual machine structure to hold arbitrary
+pointers. Each pointer is called a @dfn{slot} and each virtual machine
+currently contains 32 slots. When a virtual device needs to store
+state for each virtual machine it can simply allocate an unused slot
+(using the @code{alloc_vm_slot} function) then use the slot with that
+index to store a pointer to a structure containing the state for that
+virtual machine. Note that each virtual device should usually only
+allocate one slot; the same index is used for @emph{all} virtual
+machines.
+
+Each slot has the type @code{void *}, i.e. a pointer of any type, the
+virtual device should cast this to the type of the structure being
+stored for each virtual machine. Normally these structures will be
+allocated dynamically (with the kernel's @code{malloc} function) for
+each virtual machine.
+
+@deftypefn {vm Function} int alloc_vm_slot (void)
+This function finds an unused virtual machine slot, marks it as being
+in use and returns its index. If all slots are in use the value -1 is
+returned.
+@end deftypefn
+
+@deftypefn {vm Function} void free_vm_slot (int @var{slot})
+This function marks the virtual machine slot with index @var{slot} as
+being free for allocation.
+@end deftypefn
+
+@node VM Kill Handlers, VM Fault Handling, VM Slots, Virtual Machines
+@subsection Kill Handlers
+@cindex Kill handlers
+@cindex Virtual machines, kill handlers
+
+Most virtual devices need to be able to perform some clean-up
+operations when a virtual machine that they are providing a virtual
+device for is deleted. Usually they will need to deallocate the
+resources being used by that particular virtual machine. Our system
+provides a method for virtual devices to hook into the @code{kill_vm}
+function used to destroy a virtual machine: a @dfn{kill handler} may
+be registered with the vm module for a particular virtual machine.
+
+Each kill handler is represented by a structure, normally located in
+the structure used by the virtual device to store its per-vm state
+information.
+
+@tindex struct vm_kill_handler
+@example
+struct vm_kill_handler @{
+    struct vm_kill_handler *next;
+
+    /* The function to be called when the virtual machine is
+       killed. VM points to the virtual machine in question. */
+    void (*func)(struct vm *vm);
+@};
+@end example
+
+To install a kill handler in a virtual machine one of these structure
+must be allocated somehow, its @code{func} field set to point at a
+suitable function and the @code{add_vm_kill_handler} called with the
+virtual machine to install it in and the address of the handler
+structure. Note that each kill handler structure can only be
+registered with a @emph{single} virtual machine.
+
+@deftypefn {vm Function} void add_vm_kill_handler (struct vm *@var{vm}, struct vm_kill_handler *@var{kh})
+This function adds the kill handler pointed to by @var{kh} to the list
+of kill handlers that will be called when the virtual machine @var{vm}
+is killed.
+
+@emph{Do not} attempt to add the same kill handler to more than one
+virtual machine; the handler's @code{next} field is used to make a
+list of handlers in each virtual machine.
+@end deftypefn
+
+@node VM Fault Handling, VM Arpl Handlers, VM Kill Handlers, Virtual Machines
+@subsection Fault Handling
+@cindex Fault handling
+@cindex Virtual machines, fault handling
+
+The task used to run a virtual machine is given a set of special
+exception handlers; the function of these handlers ranges from simply
+passing the exception straight through to the virtual machine to
+emulating the instruction causing the exception.
+
+Exceptions 0, 1, 3 and 4 (Divide-by-zero, Debug, Breakpoint and
+Overflow) are handled in the simplest manner: when the instruction
+causing the exception is in the virtual machine (as opposed to being
+part of the 32-bit system code) an interrupt of the correct number is
+emulated on the virtual machine's stack.
+
+@menu
+* VM GPE Handler::
+* VM PFL Handler::
+* VM Invl Handler::
+@end menu
+
+@node VM GPE Handler, VM PFL Handler, , VM Fault Handling
+@subsubsection The GPE Handler
+@cindex GPE Handler
+@cindex Virtual machines, GPE handler
+
+The most complex of a virtual machine's exception handlers is its
+general protection handler, the reason for this is that a GP fault can
+happen in many different circumstances and many of these circumstances
+require that we emulate the instruction causing the fault.
+
+The first action of the handler is to decode all prefix opcodes in the
+instruction into a bit-mask. It then does a case switch on the actual
+instruction opcode, attempting to emulate the instruction if
+necessary. If the instruction can't be emulated (or the fault is
+actually a fatal error) the virtual machine is stopped and its
+registers are printed to the console.
+
+The following table describes the instructions which can be emulated
+and how it goes about doing the emulation.
+
+@table @code
+@item IN
+@itemx INS
+All the possible @code{IN} instructions; the handler finds the I/O
+port being addressed, looks for an I/O handler for this port and if
+one exists calls it. The result of the operation is either stored in
+part of the @code{EAX} register or for the string I/O opcodes at the
+address pointed to by @code{ES:DI}. Note that if no I/O handler exists
+for the port the value used as the result is -1.
+
+@item OUT
+@itemx OUTS
+All types of @code{OUT} instructions; these are handled in much the
+same way as @code{IN} instruction.
+
+@item CLI
+Clears the virtual interrupt-enable flag.
+
+@item STI
+Sets the virtual interrupt-enable flag, any pending interrupts will be
+dispatched. Note that the real @code{STI} instruction doesn't actually
+unmask interrupts until after the @emph{following} instruction;
+unfortunately our emulation doesn't do this: it immediately unmasks
+interrupts. Because of this the instruction combination @code{STI; HLT}
+is detected and handled as a special case.
+
+@item PUSHF
+@itemx PUSHFD
+The virtual @code{EFLAGS} register is combined with the task's actual
+@code{EFLAGS} register and this value pushed onto the virtual machine's
+stack. If an opcode prefix preceded the opcode all 32 bits are pushed,
+otherwise only the low 16 bits.
+
+@item POPF
+@itemx POPFD
+Pops the @code{FLAGS} or @code{EFLAGS} (depending on an opcode prefix)
+register stored on the virtual machine's stack and uses it to set the
+machine's virtual and physical @code{EFLAGS} register. If the virtual
+interrupt-enable flag is set any pending interrupts will be dispatched.
+
+@item INT @var{n}
+@itemx INT 3
+Emulates a software interrupt on the virtual machine's stack; this
+involves looking up the vector in the machines interrupt vector table,
+pushing the virtual machine's @code{FLAGS}, @code{CS} and @code{IP}
+registers onto its stack and setting @code{CS} and @code{IP} to the
+values from the vector table.
+
+Note that the 80386 reference manual states that an @code{INT 3}
+instruction causes a real Interrupt #3 to happen but our experience
+suggests that it may actually cause a GP fault.
+
+@deftypefn {vm Function} void simulate_int (struct vm *@var{vm}, struct trap_regs *@var{regs}, int @var{type})
+This function simulates an interrupt of type number @var{type} in the
+virtual machine represented by @var{vm}. The register frame @var{regs}
+should be the current frame of the virtual machine. This function
+should be used with care; a good place to call it from is in the task's
+return-hook, this ensures atomic access to @var{regs}.
+@end deftypefn
+
+@item IRET
+@itemx IRETD
+Emulate an @code{IRET} instruction, if an opcode prefix byte preceded
+the opcode an @code{IRETD} instruction is emulated. Basically the old
+@code{IP}, @code{CS} and @code{FLAGS} values are popped from the
+virtual machine's stack into it's register frame.
+
+@item HLT
+Stop the virtual machine until an interrupt occurs; this is handled by
+setting the @code{hlted} field of the virtual machine structure then
+suspending the machine's task.
+
+@item REP INS
+@itemx REP OUTS
+A block string I/O instruction; handled similarly to the string I/O
+instructions without a @code{REP} prefix except that a block of data
+is handled at once.
+@end table
+
+@node VM PFL Handler, VM Invl Handler, VM GPE Handler, VM Fault Handling
+@subsubsection The Page Fault Handler
+@cindex Page fault handler
+@cindex Virtual machines, pfl handler
+
+Virtual machines use a special page fault handler, it has two
+functions:
+
+@enumerate
+@item
+If the fault was caused by a user-level protection error to a page
+which is marked as being accessible to user code (i.e. a read-only
+page is being written to). The only time this can happen is when the
+virtual machine is trying to write to a virtual ROM; we compute the
+length of the instruction, advance @code{IP} over it and let the
+virtual machine continue executing.
+
+@item
+Accessing a page marked as being not-present but accessible to
+user-level code. This is because no physical memory is allocated for a
+virtual machine when it is created: its page tables are simply filled
+with not-present page-table-entries. When a page is accessed for the
+first time a new page is allocated and mapped into the hole in the
+machine's address space.
+
+Note that the virtual A20 gate adds some complications to the above
+procedure: if the address is above 1M and the A20 gate is disabled the
+address is truncated. Also any addresses in the first 64K of the
+address space have two page-table-entries when A20 is disabled.
+@end enumerate
+
+@node VM Invl Handler, , VM PFL Handler, VM Fault Handling
+@subsubsection The Invalid Opcode Handler
+@cindex Invalid opcode handler
+@cindex Virtual machines, invl handler
+
+The invalid opcode fault is caused when the processor attempts to
+execute an instruction which it doesn't recognise; usually the action
+of our handler for this exception is simply to cause the related
+interrupt in the virtual machine.
+
+There is however one special case: when the opcode faulted on is an
+@code{ARPL} instruction the system's list of Arpl handlers is scanned
+for one matching the byte stored after the opcode. If one is found the
+function its associated with is called. The reason for this is to
+provide a safe method for 16-bit code running in a virtual machine to
+call functions in kernel mode. @xref{VM Arpl Handlers}.
+
+@node VM Arpl Handlers, Virtual A20 Gate, VM Fault Handling, Virtual Machines
+@subsection Arpl Handlers
+@cindex Arpl handlers
+@cindex Virtual machines, arpl handlers
+
+As briefly mentioned in the previous section @dfn{Arpl handlers}
+provide a rudimentary system call interface for code running in
+virtual machines. This is mainly used in the Virtual BIOS to allow the
+16-bit BIOS functions to call back to code in kernel mode to handle
+the BIOS call.
+
+In a piece of 16-bit code an @code{ARPL} opcode (value 0x63) followed
+by a byte defining the Arpl handler to call is used to invoke an Arpl
+handler. The virtual machine's Invalid Opcode exception handler
+recognises that it is an Arpl call and invokes the correct handler.
+
+For example to call the Arpl handler number 20 the following piece of
+assembly language could be used:
+
+@example
+.byte 0x63, 20
+@end example
+
+Each Arpl handler is represented by a separate instance of the
+following structure:
+
+@tindex struct arpl_handler
+@example
+struct arpl_handler @{
+    struct arpl_handler *next;
+
+    /* The name of this handler. */
+    const char *name;
+
+    /* The range of Arpl functions covered by this handler,
+       both numbers are inclusive. */
+    u_short low, high;
+
+    /* The function to call when the handler is invoked
+       by a virtual machine. REGS is the register frame of
+       the machine, VM, which invoked the handler. SVC is
+       the Arpl function invoked. */
+    void (*func)(struct vm *vm, struct vm86_regs *regs, u_short svc);
+@};
+@end example
+
+To register a handler use the function @code{add_arpl_handler}, when
+the handler must be deregistered the function @code{remove_arpl_handler}
+should be called.
+
+@deftypefn {vm Function} void add_arpl_handler (struct arpl_handler *@var{ah})
+Register the Arpl handler pointed to by @var{ah} with the system.
+@end deftypefn
+
+@deftypefn {vm Function} void remove_arpl_handler (struct arpl_handler *@var{ah})
+Deregister the Arpl handler @var{ah}.
+@end deftypefn
+
+@deftypefn {vm Function} {struct arpl_handler *} get_arpl_handler (u_short @var{func})
+Attempt to locate an Arpl handler to call to handle the Arpl function
+number @var{func}. If such a handler is found a pointer to it is
+returned, otherwise the function returns a null pointer.
+@end deftypefn
+
+@node Virtual A20 Gate, , VM Arpl Handlers, Virtual Machines
+@subsection The Virtual A20 Gate
+@cindex Virtual A20 gate
+@cindex A20 gate, virtual
+@cindex Virtual machines, A20 gate
+
+In the beginning the 8086 processor had a one megabyte address space,
+however using the base and offset memory addressing module used by
+processors in the x86 line addresses up to one megabyte plus 64K can
+be generated. In the 8086 these addresses were simply truncated to the
+low 64K of the system's address space. When later members of the x86
+family were given bigger address spaces a problem occurred: how to
+maintain compatibility with the 8086 without stopping operating system's
+from using the memory above one megabyte.
+
+The accepted solution was to allow systems to ignore the 20th bit of
+all physical addresses if they wanted to. This is called the A20 gate:
+when enabled addresses with a @code{1} in their 20th bit work as
+normal, when it's disabled these addresses are effectively truncated
+to a lower part of the address space. For some perverse reason the
+keyboard controller actually controls the A20 gate.
+
+To ensure compatibility with real system's virtual machines have to be
+able to virtualise the A20 gate: obviously, the way to do this is by
+using the virtual machine's page tables to map the bottom 64K of
+memory into the space above 1M when the A20 gate is disabled.
+
+When the Virtual Keyboard receives the command to set the state of the
+virtual machine's A20 gate it calls the following function.
+
+@deftypefn {vm Function} void set_gate_a20 (struct vm *@var{vm}, bool @var{state})
+This function controls the A20 gate in the virtual machine @var{vm}.
+When the parameter @var{state} is @code{TRUE} the address line is
+enabled, when it is @code{FALSE} it is disabled.
+
+The @code{himem_ptes} field of the virtual machine structure is used
+to store the old values of the page-table-entries in the 64K range
+from 1M when A20 is disabled and copies of the machine's low 64K
+entries are mapped into this region.
+@end deftypefn
+
+@node Virtual Device Structure, Launching VMs, Virtual Machines, Virtual Devices
+@section Virtual Device Structure
+@cindex Virtual device structure
+@cindex Virtual machines, devices
+
+Throughout the previous chapter we have referred to @dfn{virtual devices},
+pieces of kernel code which virtualise the functionality of a piece of
+hardware found in a PC. Most virtual devices conform to a standard
+structure, allowing the user to specify the virtual devices given to a
+virtual machine in a very straightforward manner.
+
+Each virtual device is stored in a module of the same name: for
+example the Virtual IDE device is stored in a module called
+@samp{vide} (@pxref{Modules}). Instead of using the standard module
+structure as its base type a virtual device uses a special form of the
+module structure:
+
+@tindex struct vxd_module
+@example
+struct vxd_module @{
+    /* A normal module structure. */
+    struct module vxd_base;
+
+    /* This function is called to create a virtual device
+       of this type in the virtual machine VM. ARGC and
+       ARGV define the arguments to the device. */
+    bool (*create_vxd)(struct vm *vm, int argc,
+                       char **argv);
+@};
+@end example
+
+@noindent
+Each virtual device simply declares one of these structures at the
+start of its module structure instead of the usual
+@code{struct module}, the shell commands to initialise virtual
+machines do all the rest. For example the Virtual IDE device defines
+its module structure as follows:
+
+@example
+struct vide_module @{
+    struct vxd_module base;
+
+    /* Member functions follow... */
+@end example
+
+@noindent
+It then defines an instance of this structure as follows:
+
+@example
+struct vide_module vide_module = @{
+    @{ MODULE_INIT("vide", vide_init, NULL, NULL, vide_expunge),
+      create_vide @},
+
+    /* Member functions follow... */
+@end example
+
+The following function description documents how the @code{create_vxd}
+function in the virtual device structure is called.
+
+@deftypefun bool create_vxd (struct vm *@var{vm}, int @var{argc}, char **@var{argv})
+This function is called to install a virtual device of this type into
+the new virtual machine @var{vm}. The virtual machine's task will not
+have started executing yet.
+
+The two parameters @var{argc} and @var{argv} define the string
+arguments given to the shell command @var{vmvxd} when this virtual
+device was specified. They are similar to the parameters given to the
+C @code{main} function except that @code{@var{argv}[0]}
+@emph{really is} an argument, not the name of the device, due to this
+@var{argc} is one less than it would be in @code{main}.
+
+The function should return @code{TRUE} if it succeeds in installing a
+virtual device in the virtual machine, @code{FALSE} otherwise.
+
+Note that after being called the module containing the function is
+immediately closed. This means that the module's reference count won't
+be correct. To solve this this function should normally increment the
+@code{open_count} field of the module then when an instance of the
+virtual device is deleted @code{open_count} can be decremented.
+@xref{Modules}.
+@end deftypefun
+
+As you can see the virtual device structure says nothing about how to
+delete a virtual device when the virtual machine is killed. Usually
+each virtual device adds a kill handler to the virtual machine as it
+is created. @xref{VM Kill Handlers}.
+
+@node Launching VMs, Virtual PIC, Virtual Device Structure, Virtual Devices
+@section Launching Virtual Machines
+@cindex Launching virtual machines
+@cindex Virtual machines, launching
+
+The shell is used to configure and launch a virtual machine; this
+involves initialising a virtual machine, specifying the hardware
+virtualised by this machine in a series of shell commands and a final
+command to actually launch the newly created virtual machine.
+
+@deffn {Shell Command} vminit [name] [memory-size] [display-type]
+This command starts a new virtual machine initialisation block for a
+virtual machine called @var{name}.
+
+The parameter @var{memory-size} defines the number of kilobytes of
+memory given to the new virtual machine while @var{display-type} names the
+type of virtual video adaptor given to the machine
+(@pxref{Video Drivers}).
+
+If any of the optional parameters aren't specified suitable default
+values are chosen.
+@end deffn
+
+@deffn {Shell Command} vmvxd module-name [args @dots{}]
+This command is used to install a virtual device into the virtual
+machine currently being configure (i.e. the most recent @code{vminit}
+command).
+
+The parameter @var{module-name} names the virtual device module
+containing the virtualisation code, the optional argument strings
+@var{args} are passed to the virtual device's initialisation function.
+@end deffn
+
+@deffn {Shell Command} vmlaunch
+Use this command to end a initialisation block started by the
+@code{vminit} command. The virtual machine is started executing.
+@end deffn
+
+Using the above shell commands blocks of commands completely
+configuring a virtual machine can be built. If these commands are
+saved in files they can be used as shell scripts to start a particular
+type of virtual machine. An example initialisation block follows
+(lines starting with @samp{#} are considered comments by the shell).
+
+@example
+# Start the initialisation block for a VM with
+# 2 megabytes of memory and a CGA display.
+vminit 2048 CGA
+
+  # Give it virtual PIC, PIT, DMA, CMOS and BIOS devices,
+  vmvxd vpic
+  vmvxd vpit
+  vmvxd vdma
+  vmvxd vcmos
+  vmvxd vbios
+
+  # a virtual IDE disk,
+  vmvxd vide /usr/dos-hd.image
+
+  # and a virtual printer.
+  vmvxd vprinter 0x278
+
+# Now launch the new machine.
+vmlaunch
+@end example
+
+@node Virtual PIC, Virtual PIT, Launching VMs, Virtual Devices
+@section The Virtual PIC
+@cindex Virtual PIC
+@cindex PIC, virtual
+@cindex Virtual devices, PIC
+
+The PIC is the system's Programmable Interrupt Controller, used to
+receive interrupt requests from external devices and pass them along
+to the processor when possible. A PC has two PICs, providing a total
+of 15 different IRQs.
+
+The virtual device module @samp{vpic} should be installed in each
+virtual machine; it creates two virtual PICs for the task. It supports
+most of the features that a real PIC offers though some of the less
+often used features have been left out to keep things simple. The
+virtualisation should be able to cope with the usual ways in which the
+system's interrupt controllers are used. Supported features include:
+
+@itemize @bullet
+@item
+Simulating an IRQ by a virtual device, see the function
+@code{simulate_vm_irq}.
+
+@item
+Disabling and enabling the processor's interrupt-enable flag.
+
+@item
+Reprogramming individual controllers via the ICW (Initialisation
+Command Words) interface. This includes being able to set the
+interrupt vectors used for a controller and the master/slave
+configuration. Note that most of the ICW4 options are not supported at
+present.
+
+@item
+The OCW (Operation Command Words) commands, these include setting and
+reading the mask register, the end-of-interrupt commands and reading
+the ISR and IRR registers. Note that some of the more esoteric options
+of the OCW2 and OCW3 commands are unsupported.
+@end itemize
+
+@deftypefn {vpic Function} void simulate_irq (struct vm *@var{vm}, u_char @var{irq})
+This function is used to simulate an IRQ of level @var{irq} in the
+virtual machine represented by @var{vm}. It is usually used by virtual
+devices when they need to virtualise an interrupt from the device they
+are emulating.
+@end deftypefn
+
+@deftypefn {vpic Function} void IF_enabled (struct vm *@var{vm})
+This function must be called each time the virtual machine's virtual
+interrupt-flag is set (i.e. by the @code{STI} emulation). If any
+interrupt requests are pending they will be dispatched to the machine
+as soon as possible.
+@end deftypefn
+
+@deftypefn {vpic Function} void IF_disabled (struct vm *@var{vm})
+This must be called when the virtual interrupt-flag of the machine
+@var{vm} is cleared (i.e. by the @code{CLI} emulation).
+@end deftypefn
+
+@deftypefn {vpic Function} void set_mask (struct vm *@var{vm}, bool @var{set}, u_short @var{mask})
+This function alters the state of the mask of the Virtual PIC installed
+in @var{vm}. When @var{set} is @code{TRUE} all interrupt requests whose
+bit is set in @var{mask} are masked out; when @var{set} is @code{FALSE}
+all those IRQs whose bit in @var{mask} is set are enabled.
+
+This function is usually called by a virtual device's @code{create_vxd}
+function to enable the interrupts that it virtualises. (To start with
+all IRQs are disabled except for IRQ2, the cascade for the slave PIC.)
+@end deftypefn
+
+@node Virtual PIT, Virtual DMA, Virtual PIC, Virtual Devices
+@section The Virtual PIT
+@cindex Virtual PIT
+@cindex PIT, virtual
+@cindex Timer, virtual
+@cindex Virtual devices, PIT
+
+The PIT is the Programmable Interval Timer, used by PCs to provide
+accurate time keeping of short intervals. The PIT has three channels,
+one of which is connected to IRQ0; each of which can be put into one
+of five different modes of operation to provide different types of
+timer (one-shot, continuous, etc@dots{}).
+
+The virtual device module @samp{vpit} should be installed in each
+virtual machine to give it a virtual PIT device, this emulates the
+actions of a real PIT. All the PIT I/O ports are virtualised and used
+to respond to the commands made of the device. A 1024Hz timer is used to
+simulate the channel zero interrupt up to a maximum rate of 200 times
+per second.
+
+The following table lists the I/O ports virtualised:
+
+@table @asis
+@item 0x40
+Channel 0 counter.
+
+@item 0x41
+Channel 1 counter.
+
+@item 0x42
+Channel 2 counter.
+
+@item 0x43
+Mode control register.
+@end table
+
+The three channels are initialised to the same state that the BIOS
+initialises them to in a real PC. That is:
+
+@table @asis
+@item Channel 0
+Mode zero, causing an IRQ0 roughly 18.2 times per second.
+
+@item Channel 1
+Mode two, counting at about 66kHz. This channel is historically used
+for the system's memory refreshing: therefore most applications don't
+use it.
+
+@item Channel 2
+Mode three, a square-wave at about 896Hz. This channel is normally
+used by the speaker.
+@end table
+
+One of the main problems with virtualising the PIT is that virtual
+machines don't have the processor all of the time. This means that
+some thought has to be given to the way in which a timer is
+implemented. The two obvious alternatives are to run the timer in
+real-time (i.e. it still ticks even when the virtual machine is not
+running), or to run it in ``virtual'' time in which case the timer
+only ticks when the virtual machine actually has the CPU.
+
+We decided to use the first option: run the timer channels in real
+time. This was chosen it most closely resembles what a real PIT does:
+namely to measure short intervals of time accurately. It also gives
+time-of-day clocks ticking on IRQ0 a better chance of keeping time.
+One drawback of this method is that if a virtual machine's channel
+zero timer interrupts while the machine is not running the interrupt
+will not be received until the virtual machine returns to the head of
+the run queue. Even worse, if lots of tasks are waiting to run and a
+virtual machine is suspended for long enough that multiple timer
+interrupts occur the virtual machine will only receive one interrupt.
+
+As noted above, only channel zero actually uses a timer to measure its
+intervals (@pxref{Timers}); this is because it is the only channel
+linked to an IRQ and therefore the only needing to be asynchronous.
+The other channels simply store the time at which they were started,
+when their counter registers are polled the virtual PIT simply
+calculates the counter's value from the current time and the time at
+which the timer was started.
+
+@deftypefn {vpit Function} {struct vpit *} get_vpit (struct vm *@var{vm})
+Returns a pointer to the structure representing the virtual PIT of
+machine @var{vm}. If no such device has been installed in @var{vm} a
+null pointer is returned.
+@end deftypefn
+
+@node Virtual DMA, Virtual BIOS, Virtual PIT, Virtual Devices
+@section Virtual DMA Controller
+
+@include vdma.texi
+
+@node Virtual BIOS, Virtual CMOS, Virtual DMA, Virtual Devices
+@section Virtual BIOS
+@cindex Virtual BIOS
+@cindex BIOS, virtual
+@cindex Virtual devices, BIOS
+
+The BIOS is the PC's Basic Input/Output System: a set of assembly
+language routines to provide a standard interface to the devices found
+in most systems. These routines are divided into groups for each piece
+of hardware or concept; each group being called through a software
+interrupt.
+
+Our virtual BIOS (a standard virtual device in a module called @samp{vbios})
+handles most of the standard BIOS functions in a way that sits well
+with the rest of the system. Although in theory it would be possible
+to simply map a standard BIOS into the address space of each virtual
+machine (since our system virtualises the devices it must communicate
+with). In practice however it is much better to use a custom BIOS
+since it can be designed to use the system at the kernel level,
+without incurring the large overhead of talking to each virtual device
+through the virtual I/O mechanism. For example the BIOS function to
+wait for a short time period uses a standard kernel timer instead of
+the virtual PIT.
+
+Each virtual machine which has a virtual BIOS installed in it has a
+copy of some 16-bit code copied into its system ROM area. This code
+provides the assembly language functions called through the interrupt
+vector table when the virtual machine's operating system wishes to
+call a BIOS function. Some of these stubs are able to handle the BIOS
+function themselves (for example the keyboard services on INT 16)
+while others simply use an @code{ARPL} instruction to invoke a
+function in the vbios module itself to handle the BIOS function
+(@pxref{VM Arpl Handlers}).
+
+@node Virtual CMOS, Virtual Floppy, Virtual BIOS, Virtual Devices
+@section Virtual CMOS
+@cindex Virtual CMOS
+@cindex CMOS, virtual
+@cindex RTC
+@cindex Real-time clock
+@cindex Virtual devices, CMOS
+@cindex Virtual devices, RTC
+
+The CMOS is a device introduced with the PC/AT used to store setup information
+relating to the hardware attached to the PC. This information includes the type
+and number of hard disks and floppy disks. The standard CMOS hardware allows
+storage of up to 64 bytes of information, although modern PC's can have
+up to 2K bytes of storage, this being used in a non-standard way
+according to the wishes of the manufacturer to hold information
+relating to non-standard extensions.
+
+The hardware also includes a RTC (Real Time Clock) used to store the current
+time and date and also an alarm. The RTC can also provide a periodic interrupt
+with intervals from 2Hz up to 8192Hz.
+
+The CMOS is battery backed to allow the clock to keep the correct time even
+when the machine is switched off and to allow the permanent storage of the 
+BIOS settings.
+
+The CMOS is emulated by the @samp{vcmos} module. Emulation of the time
+facilities is simulated by having a function activated every second to update
+the time and date and to check if the alarm should be set off. Allowance is
+also made for the periodic interrupt.
+Because each virtual machine's virtual CMOS has a separate time update function,
+each virtual machine can set its RTC to reflect any time and date without
+interfering with other virtual machines or the main clock used by the operating
+system.
+
+Upon creation of a virtual CMOS, it is setup in the following way:
+@itemize @bullet
+@item The time and date is set to the current system time and date.
+@item The Periodic, Alarm and Time Update interrupts are disabled.
+@item The century byte is set according to the actual century.
+@item The size of the conventional and extended memory is stored in the memory.
+@item The CMOS checksum is calculated to present a correctly functioning CMOS.
+@end itemize
+
+To allow for virtualisation of the CMOS, the following port references are
+trapped and redirected to the @samp{vcmos} module.
+
+@table @asis
+@item 0x70
+Address Register
+
+@item 0x71
+Data Register
+@end table
+
+Access to the CMOS is quite simple. The CMOS memory address (0 - 0x3F) is
+written to port 0x70 and then the data is either written or read by writing to 
+or reading from port 0x71.
+
+Because of the nature of the CMOS, the only CMOS memory address that has to be 
+captured is 0x0C which holds the status of the last interrupt to be activated.
+When this port is read from, its value must be set to 0.
+
+@cindex NMI
+Another function of the CMOS is to enable and disable the NMI (Non-Maskable
+Interrupt). If bit 7 of the memory address written to port 0x70 is set then
+the NMI is enabled, else it is disabled. This affects the value if the
+@code{nmi_sts} flag in the @code{vm} structure.
+
+The @samp{vcmos} module provides the following functions:
+
+@deftypefn {vcmos Function} u_char get_vcmos_byte (struct vm *@var{vm}, u_int @var{addr})
+This allows another module to get a byte in the Virtual CMOS memory.
+
+@var{vm} is the virtual machine.
+
+@var{addr} is the memory address in the range 0 - 0x3F.
+
+This function returns the byte at @var{addr}.
+@end deftypefn
+
+@deftypefn {vcmos Function} void set_vcmos_byte (struct vm *@var{vm}, u_int @var{addr}, u_char @var{val})
+This allows another module to set a byte in the Virtual CMOS memory.  After the
+memory value has been set, the checksum for the CMOS is automatically
+recalculated.
+
+@var{vm} is the virtual machine.
+
+@var{addr} is the memory address in the range 0 - 0x3F.
+
+@var{val} is the new value to set the memory location to.
+
+This function does not return a value.
+@end deftypefn
+
+@deftypefn {vcmos Function} void get_bcd_time (struct vm *@var{vm}, struct vm86_regs *@var{regs})
+This function allows for emulation of the BIOS service INT 0x1A function 0x02.
+It reads the current time from the CMOS clock.
+
+@var{vm} is the virtual machine.
+
+@var{regs} is the register set of the virtual machine.
+
+The register values are filled as follows:
+
+@table @code
+@item CH
+The hours in BCD format.
+
+@item CL
+The minutes in BCD format.
+
+@item DH
+The seconds in BCD format.
+
+@item DL
+The daylight saving time code: 0 = standard time, 1 = daylight saving
+time.
+
+@item EFLAGS
+The carry-flag is cleared if clock is running, or set if the clock is
+stopped.
+@end table
+
+This function does not return a value.
+@end deftypefn
+
+@deftypefn {vcmos Function} void set_bcd_time (struct vm *@var{vm}, struct vm86_regs *@var{regs})
+This function allows for emulation of the BIOS service INT 0x1A function 0x03.
+It sets the current time in the CMOS clock.
+
+@var{vm} is the virtual machine.
+
+@var{regs} is the register set of the virtual machine.
+
+The clock is set according to the register values as follows: 
+
+@table @code
+@item CH
+The hours in BCD format.
+
+@item CL
+The minutes in BCD format.
+
+@item DH
+The seconds in BCD format.
+
+@item DL
+The daylight saving time code: 0 = standard time, 1 = daylight saving
+time.
+@end table
+
+This function does not return a value.
+@end deftypefn
+
+@deftypefn {vcmos Function} void get_bcd_date (struct vm *@var{vm}, struct vm86_regs *@var{regs})
+This function allows for emulation of the BIOS service INT 0x1A function 0x04.
+It reads the current date from the CMOS clock.
+
+@var{vm} is the virtual machine.
+
+@var{regs} is the register set of the virtual machine.
+
+The register values are filled as follows:
+
+@table @code
+@item CH
+The century (19 or 20) in BCD format.
+
+@item CL
+The year in BCD format.
+
+@item DH
+The month in BCD format.
+
+@item DL
+The day of the month in BCD format.
+
+@item EFLAGS
+The carry-flag is cleared if the clock is running, set if the clock is
+stopped.
+@end table
+
+This function does not return a value.
+@end deftypefn
+
+@deftypefn {vcmos Function} void set_bcd_date (struct vm *@var{vm}, struct vm86_regs *@var{regs})
+This function allows for emulation of the BIOS service INT 0x1A function 0x05.
+It sets the current date in the CMOS clock.
+
+@var{vm} is the virtual machine.
+
+@var{regs} is the register set of the virtual machine.
+
+The clock is set according to the register values as follows: 
+
+
+@table @code
+@item CH
+The century (19 or 20) in BCD format.
+
+@item CL
+The year in BCD format.
+
+@item DH
+The month in BCD format.
+
+@item DL
+The day of the month in BCD format.
+@end table
+
+This function does not return a value.
+@end deftypefn
+
+@deftypefn {vcmos Function} void set_alarm (struct vm *@var{vm}, struct vm86_regs *@var{regs})
+This function allows for emulation of the BIOS service INT 0x1A function 0x06.
+It sets an alarm in the CMOS clock.
+This function does not return a value.
+@var{vm} is the virtual machine.
+
+@var{regs} is the register set of the virtual machine.
+
+The alarm is set according to the register values as follows:
+
+@table @code
+@item CH
+The hours in BCD format.
+
+@item CL
+The minutes in BCD format.
+
+@item DH
+The seconds in BCD format.
+@end table
+
+The carry-flag in the @code{EFLAGS} register is cleared if the alarm is
+set, else set if alarm already set or clock stopped.
+
+This function does not return a value.
+@end deftypefn
+
+@deftypefn {vcmos Function} void reset_alarm (struct vm *@var{vm}, struct vm86_regs *@var{regs})
+This function allows for emulation of the BIOS service INT 0x1A function 0x07.
+It clears any pending alarm request on the CMOS clock.
+
+@var{vm} is the virtual machine.
+
+@var{regs} is the register set of the virtual machine.
+
+The alarm is cleared.
+
+This function does not return a value.
+@end deftypefn
+
+@node Virtual Floppy, Virtual IDE, Virtual CMOS, Virtual Devices
+@section Virtual Floppy
+@cindex Virtual floppy
+@cindex Virtual devices, floppy
+@cindex Floppy, virtual
+
+@include vfloppy.texi
+
+@node Virtual IDE, Virtual Keyboard, Virtual Floppy, Virtual Devices
+@section Virtual IDE
+@cindex Virtual IDE
+@cindex Virtual devices, IDE
+@cindex Hard disk, virtual
+
+The virtual device module @samp{vide} provides a complete emulation of
+a simple IDE controller with a single hard disk attached to it. When
+installing this virtual device in a virtual machine the module must be
+told how to virtualise the disk, this can either be done with a file
+in the system's filing system (@pxref{Filing System}) or by using all
+of a partition on a physical hard disk (note that using the partition
+representing the whole of a hard disk can allow a virtual machine to
+see the same hard disk as the physical machine does).
+
+For maximum performance the Virtual IDE device provides two levels of
+accessing the contents of a virtual hard disk:
+
+@itemize @bullet
+@item
+I/O port level virtualisation. For virtual machines accessing the IDE
+controller at the lowest level. Unfortunately this is not particularly
+fast (because of the overhead in trapping and emulating all I/O port
+access and the fact that each block transferred is read through an I/O
+port). The IDE controller emulated supports all the basic IDE commands
+and conforms to the draft AT Attachment Interface standard (from the
+ANSI X3 committee).
+
+@item
+Since many virtual machines will only access their hard disk through
+the BIOS INT 13H functions the Virtual IDE device also provides a set
+of functions to read and write blocks from the virtual disk into the
+user segment. The Virtual BIOS uses these functions to handle the BIOS
+calls that refer to the hard disk. This greatly improves the
+performance of the virtual disk.
+@end itemize
+
+When installing a Virtual IDE device in a virtual machine (using the
+@code{vmvxd} shell command) the arguments to the device define how the
+virtual disk is stored. The argument template is as follows:
+
+@example
+@var{image} [@var{size}]
+@end example
+
+@noindent
+The @var{image} argument is either the name of a hard disk partition
+followed by a colon (i.e. @samp{hda:}, @samp{hda1:}, @dots{}) or the
+name of a file. The optional @var{size} argument is only used when
+@var{image} is a file name; it defines the maximum number of blocks
+that the disk should contain (the actual number of blocks may be
+slightly less to allow for a suitable disk geometry).
+
+Example commands to install a Virtual IDE device in the virtual
+machine currently being defined could be:
+
+@example
+# A 20M disk from the file `/usr/hd.image'
+vmvxd vide /usr/hd.image 40960
+
+# A disk using the file `/usr/dos.image', it will use the
+# size of the file to get it's @var{size} parameter.
+vmvxd vide /usr/dos.image
+
+# Use all of the first physical disk as a virtual disk
+vmvxd vide hda:
+@end example
+
+When creating virtual machines note that it is probably @emph{not} a
+good idea to share virtual disks between more than one virtual machine
+at any one time; it may well lead to catastrophic disk corruption!
+
+The header file @file{<vmm/vide.h>} defines the Virtual IDE module,
+the functions that it provides (as well as the standard virtual device
+creation function) are as follows.
+
+@deftypefn {vide Function} void delete (struct vm *@var{vm})
+Remove the Virtual IDE device from the virtual machine @var{vm}.
+@end deftypefn
+
+@deftypefn {vide Function} int read_user_blocks (struct vm *@var{vm}, u_int @var{drvno}, u_int @var{head}, u_int @var{cyl}, u_int @var{sector}, int @var{count}, void *@var{buf})
+This function reads @var{count} 512-byte sized blocks from the Virtual
+IDE device of the virtual machine @var{vm} to the buffer @var{buf}, a
+logical address in @emph{user} space. The blocks will be read from the
+block on the virtual disk defined by @var{cyl}, @var{head} and
+@var{sector} on the disk numbered @var{drvno} (this must be zero since
+only one virtual disk is supported by the controller).
+
+The value returned is either the number of blocks successfully read
+or -1 to denote an error before any blocks could be read.
+@end deftypefn
+
+@deftypefn {vide Function} int write_user_blocks (struct vm *@var{vm}, u_int @var{drvno}, u_int @var{head}, u_int @var{cyl}, u_int @var{sector}, int @var{count}, void *@var{buf})
+This is similar to the @code{read_user_blocks} function except that
+blocks are written to the virtual disk instead of being read from it.
+The result is determined in the same way.
+@end deftypefn
+
+@deftypefn {vide Function} bool get_status (struct vm *@var{vm}, u_char *@var{statp}, u_char *@var{errp})
+If the virtual machine @var{vm} has a virtual IDE controller installed
+in it, the contents of the locations @var{statp} and @var{errp} are set
+to the values of the controller's status and error registers
+respectively, then the value @code{TRUE} is returned. Otherwise, when
+no IDE is installed the value @code{FALSE} is returned and @var{statp}
+and @var{errp} left unmodified.
+@end deftypefn
+
+@deftypefn {vide Function} bool get_geom (struct vm *@var{vm}, u_int *@var{headsp}, u_int *@var{cylsp}, u_int *@var{sectsp})
+This function sets the contents of the locations @var{headsp}, @var{cylsp}
+and @var{sectsp} to the number of heads, cylinders and sectors that
+the virtual hard disk of the virtual machine @var{vm} has, and then
+returns @code{TRUE}. If @var{vm} has no virtual hard disk the value
+@code{FALSE} is returned.
+@end deftypefn
+
+@node Virtual Keyboard, Virtual Printer, Virtual IDE, Virtual Devices
+@section Virtual Keyboard
+@cindex Virtual keyboard
+@cindex Keyboard, virtual
+@cindex Virtual devices, keyboard
+
+Every virtual machine is given a virtual keyboard, as part of its tty,
+allocated when the virtual machine is created. For this reason the
+@samp{vkbd} module is not a standard virtual device and @emph{should not}
+be included in the configuration procedure of a virtual machine.
+
+A virtual keyboard is another type of logical keyboard, it exactly
+emulates a real keyboard and its 8042 controller device. As key codes
+are received by the logical keyboard they are translated back into
+scan codes and stored in a buffer in the virtual keyboard. If enabled,
+a virtual IRQ is generated to let the virtual machine know that new
+keyboard input is available.
+
+The I/O ports virtualised by this device are:
+
+@table @code
+@item 0x60
+The keyboard's input/output data register, from which scan codes and
+other data from the keyboard can be read or sometimes written.
+
+@item 0x61
+The system control port, only for compatibility with the 8255 device.
+This port also controls the systems built-in speaker, when the two
+speaker-related bits are twiddled the TTY device is used to turn the
+speaker on and off, to emulate this as well as possible.
+
+@item 0x64
+The keyboard controllers input/output port.
+@end table
+
+@node Virtual Printer, , Virtual Keyboard, Virtual Devices
+@section Virtual Printer Ports
+
+@include vprinter.texi

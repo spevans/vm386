@@ -1,0 +1,232 @@
+
+A @dfn{device driver} is a module used to control all accesses that the
+system makes to a specific hardware resource. This chapter explains how
+to use some of the system's device drivers, the drivers not documented
+here are either invisible to the user or totally trivial.
+
+Some of the modules documented here are not really device drivers, this
+part of the manual seemed the best place for them though.
+
+@menu
+* Hard Disk::
+* Floppy Disk::
+* Ramdisk::
+* TTY Device::
+* Printer Spooler::
+* Syslog Daemon::
+@end menu
+
+@node Hard Disk, Floppy Disk, , Devices
+@section The Hard Disk Device Driver
+@cindex Hard disk device driver
+@cindex Devices, hard disk
+
+The hard disk device driver allows the system (and especially, the
+filing system, @pxref{Filing System}) to talk to any IDE hard disks
+connected to the host computer.
+
+When the hard disk driver is initialised it probes for IDE disks (only
+on the first controller at present), and recognised disks are added to
+the system's list of hard-disk-like devices. Each device is then
+scanned for partitions, each partition is given a unique name and added
+to the list of hard disk partitions that the system maintains.n
+
+The name of each partition is made from the name of the disk (either
+@samp{hda} or @samp{hdb}) and a number defining which partition it is.
+The primary partitions are given numbers one to four, any extended
+partitions are given numbers starting at five. For example @samp{hda1}
+refers to the first primary partition of the first IDE hard disk,
+while @samp{hdb6} refers to the second extended partition of the second
+IDE disk.
+
+A special partition is created which spans the whole of the hard disk,
+it has the same name as the device it spans (i.e. @samp{hda}).
+
+The hard disk defines the following shell commands.
+
+@deffn {Command} hdinfo
+List the currently recognised hard disk devices, and the partitions
+which they contain.
+@end deffn
+
+@deffn {Command} hdperf partition blocks [blocks-per-request]
+This command times the performance of hard disk reads from the hard
+disk partition @var{partition}. It reads @var{blocks} number of
+512-byte blocks from the partition calculating the amount of time it
+takes.
+
+If the @var{blocks-per-request} parameter is defined it specifies the
+number of blocks to read in each request made to the device driver.
+Normally the data throughput should increase as this value is raised.
+
+The time period is measured in @dfn{ticks}, each tick is 1/1024 of a
+second.
+
+This command actually makes two timings: the first by requesting the
+device driver to read the blocks, the second by reading the blocks from
+the filing system's buffer cache. The second timing will not work if
+the partition is not mounted in the filing system (@pxref{Filing System}).
+Also, the @var{blocks-per-request} argument is not used when reading
+from the buffer-cache, a standard value of 2 is used.
+@end deffn
+
+For details on how to mount a hard disk partition in the filing system
+see @ref{FS Devices}.
+
+@node Floppy Disk, Ramdisk, Hard Disk, Devices
+@section The Floppy Disk Device Driver
+@cindex Floppy disk device driver
+@cindex Devices, floppy disk
+
+@include floppy.texi
+
+@node Ramdisk, TTY Device, Floppy Disk, Devices
+@section The Ramdisk
+@cindex Ramdisk
+@cindex Devices, ramdisk
+
+@include ramdisk.texi
+
+@node TTY Device, Printer Spooler, Ramdisk, Devices
+@section The TTY Device Driver
+@cindex TTY devices
+@cindex Devices, tty
+@cindex Consoles
+
+A @dfn{tty} is a virtual console. Multiple tty's may be open at any
+one time, the tty actually being displayed is known as the
+@dfn{foreground tty}. Any characters typed at the keyboard are always
+transmitted to the foreground tty.
+
+TTY's are put to two main purposes by the system
+
+@enumerate
+@item
+To give the shell (or any other task) a place to input and output.
+Each shell opens a new tty from which it reads command lines, all
+output from the shell goes to the same tty.
+
+@item
+To provide each virtual machine with virtual display hardware and a
+virtual keyboard. All virtual machines have a tty allocated for them
+when they are created.
+@end enumerate
+
+All tty's respond to the following hot keys (a key sequence that can
+be typed at any time)
+
+@table @kbd
+@item Alt-@key{KpMinus}
+(That's the @samp{-} key on the numeric key-pad while the @key{Alt} key
+is held down.) Switch to the previous tty.
+
+@item Alt-@key{KpPlus}
+Switch to the next tty.
+
+@item Alt-@key{SysReq}
+Switch to the tty of the shell that was created when the system
+initialised itself.
+
+@item Alt-@key{ESC}
+Spawn a new shell task in a new tty.
+
+@item Ctrl-Alt-@key{DEL}
+Reboot the system immediately.
+@end table
+
+When a line of input is being read from a tty (i.e. in a shell) that
+is not in a virtual machine, the following commands are available to
+edit the line being entered. In general these will be bound to the
+same keys as the equivalent functions in the Emacs editor. The
+following table lists the available commands, where the variable
+@var{arg} is mentioned it refers to the @dfn{prefix argument} entered
+by the metafied numeric keys.
+
+@table @kbd
+@item C-f
+@itemx @key{Right}
+Move forward @var{arg} characters.
+
+@item C-b
+@itemx @key{Left}
+Move backward @var{arg} characters.
+
+@item C-a
+Move to the beginning of the line.
+
+@item C-e
+Move to the end of the line.
+
+@item C-d
+Either delete the @var{arg} characters starting with the one under the
+cursor or if the cursor is at the end of the line accept the current
+contents of the buffer (an end-of-line character).
+
+@item @key{Backspace}
+Delete the @var{arg} characters preceding the cursor.
+
+@item @key{RET}
+Insert a newline character at the end of the line and accept the
+contents of the buffer.
+
+@item C-l
+Redisplay the buffer.
+
+@item C-@key{SPC}
+Set the value of the mark to the current cursor position.
+
+@item C-x C-x
+Exchange the cursor position with that of the mark.
+
+@item C-n
+@itemx @key{Down}
+Move forward @var{arg} lines in the history list.
+
+@item C-p
+@itemx @key{Up}
+Move back @var{arg} lines in the history list.
+
+@item M-<
+Display the first line in the history list.
+
+@item M->
+Display the last line in the history list.
+
+@item M-0
+@itemx M-1
+@itemx M-2
+@itemx M-3
+@itemx M-4
+@itemx M-5
+@itemx M-6
+@itemx M-7
+@itemx M-8
+@itemx M-9
+Append the number typed to the end of the (decimal) prefix argument
+for the following command. For example typing @kbd{M-1 M-0 C-f} moves
+the cursor ten characters forwards.
+
+@item M--
+(That's @kbd{Meta-minus}.) Negate the value of the prefix argument for
+the next command. For example typing @kbd{M-- M-4 C-f} moves
+@emph{backwards} four characters.
+@end table
+
+@noindent
+The notation @kbd{C-@var{x}} and @kbd{M-@var{x}} means the @var{x} key
+with the @key{Control} modifier and the @key{Meta} qualifier
+respectively. To generate a @kbd{M-@var{x}} event either type
+@kbd{Alt-@var{x}} or @kbd{@key{ESC} @var{x}}.
+
+@node Printer Spooler, Syslog Daemon, TTY Device, Devices
+@section The Printer Spooler
+@cindex Printer spooler
+@cindex Spooler, printer
+
+@include spooler.texi
+
+@node Syslog Daemon, , Printer Spooler, Devices
+@section The Syslog Daemon
+@cindex Syslog daemon
+
+@include syslogd.texi

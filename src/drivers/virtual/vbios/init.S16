@@ -1,0 +1,145 @@
+/* init.S16 -- Virtual bios stubs and setup code. */
+
+#define __ASM__
+#include <vmm/vbios.h>
+
+	.extern	int_9, int_16		/* From kbd.S16 */
+	.extern	disk_init, int_19	/* From disk.S16 */
+	.extern	int_8, irq_8		/* From timer.S16 */
+
+entry __start
+__start:
+	jmp	start
+
+banner_txt:
+	.ascii	"VMM/386 Virtual BIOS"
+	.byte	0x0d, 0x0a
+	.ascii	"Version 0.0 1995"
+	.byte	0x0d, 0x0a, 0x0a, 0x0a, 0x0a
+banner_txt_end:
+banner_len =	banner_txt_end-banner_txt
+
+start:
+	cli
+	mov	ax,#0x30
+	mov	ss,ax
+	mov	sp,#0x100
+
+	/* Fill 256 vector table entries with iret_vec. */
+	push	cs
+	pop	ax
+	shl	eax,#16
+	mov	ax,#iret_vec
+	xor	di,di
+	mov	es,di
+	mov	cx,#256
+	cld
+	rep
+	stosd
+	
+	/* Copy vector table. */
+	push	cs
+	pop	ds
+	mov	si,#vectors
+vec_lop:
+	lodsw
+	test	ax,ax
+	jz	vec_end
+	mov	cx,ax
+	lodsw
+	mov	di,ax
+	shl	di,#2
+	cld
+	rep
+	movsd
+	jmp	vec_lop
+vec_end:
+
+	/* Setup BIOS data area. */
+	call	disk_init
+	ARPL(0x0f)
+
+	/* Unmask and enable IRQs */
+	in	al,0x21
+	and	al,#0xf9		/* Keyboard, Cascade */
+	out	0x21,al
+	in	al,0xa1
+	and	al,#0xfd		/* IRQ9 */
+	out	0xa1,al
+	sti
+
+	/* Print out a banner. */
+	mov	ax,#0x1301
+	mov	bx,#0x0007
+	mov	cx,#banner_len
+	mov	dx,#0x0000
+	push	cs
+	pop	es
+	mov	bp,#banner_txt
+	int	0x10
+
+	/* Boot the system. */
+	int	0x19
+stop:
+	hlt
+	jmp	stop
+
+	/* All int vectors are initialised to point here. */
+iret_vec:
+	iret
+
+vint10:
+	ARPL(0x10)
+	iret
+vint11:
+	ARPL(0x11)
+	iret
+vint12:
+	ARPL(0x12)
+	iret
+vint13:
+	ARPL(0x13)
+	sti
+	retf	#2
+vint14:
+	ARPL(0x14)
+	iret
+vint15:
+	ARPL(0x15)
+	sti
+	retf	#2
+vint17:
+	ARPL(0x17)
+	iret
+vint18:
+	ARPL(0x18)
+	iret
+vint1a:
+	ARPL(0x1a)
+	sti
+	retf	#2
+
+	.align	2
+vectors:
+	/* number of vectors, first vector to patch. */
+	.word	2, 0x08
+	.word	int_8, VBIOS_SEG
+	.word	int_9, VBIOS_SEG
+
+	.word	11, 0x10
+	.word	vint10, VBIOS_SEG
+	.word	vint11, VBIOS_SEG
+	.word	vint12, VBIOS_SEG
+	.word	vint13, VBIOS_SEG
+	.word	vint14, VBIOS_SEG
+	.word	vint15, VBIOS_SEG
+	.word	int_16, VBIOS_SEG
+	.word	vint17, VBIOS_SEG
+	.word	vint18, VBIOS_SEG
+	.word	int_19, VBIOS_SEG
+	.word	vint1a, VBIOS_SEG
+
+	.word	1, 0x70
+	.word	irq_8, VBIOS_SEG
+
+	.word	0

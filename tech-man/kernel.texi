@@ -1,0 +1,2162 @@
+
+The @dfn{kernel} is the core of the system, it implements the most
+basic parts of the system. This includes the memory management, task
+handling and module loading functions.
+
+Unless otherwise stated, all the functions and variables documented in
+this chapter are members of the kernel module. This module is defined
+in the header file @file{<vmm/kernel.h>}, the variable @code{kernel}
+always contains a pointer to this module (@pxref{Kernel Module}).
+
+@menu
+* Modules::
+* Interrupts::
+* Exception Handling::
+* Memory Management::
+* Kernel Malloc::
+* Task Handling::
+* Time and Date Handling::
+* Timers::
+* DMA Handling::
+* Error Codes::
+* Formatted Output::
+@end menu
+
+@node Modules, Interrupts, , Kernel
+@section Modules
+@cindex Modules
+
+A @dfn{module} is a shared library, they are stored in files on disk
+and loaded into the kernel address space as required. Modules in
+memory which are actually unused can be unloaded, freeing the memory
+they occupy for other uses.
+
+Each module exports a well-defined set of functions and variables
+which may then be referenced (used) by modules which have previously
+obtained a handle on the module in question. This handle is a C
+structure containing a @code{struct module} as its first member,
+followed by function pointers and data items which can be referenced
+by other modules.
+
+@menu
+* Using Modules::
+* Module Structure::
+* Creating Modules::
+* Module Files::
+* Static Modules::
+* Kernel Module::
+@end menu
+
+@node Using Modules, Module Structure, , Modules
+@subsection Using Modules
+@cindex Using modules
+@cindex Modules, using
+
+Before being able to reference the functions exported by a module the
+caller must obtain a pointer to the module's structure. This is called
+@dfn{opening} the module, the @code{open_module} function is used to
+do this. After an opened module has been finished with it must be
+@dfn{closed} using the @code{close_module} function, this is required
+so that a module can always tell how many ``live'' references to it
+exist (and consequently if it can expunge itself from memory).
+
+@vindex SYS_VER
+Each module has a @dfn{version number} defining the number of
+revisions it has undergone. This allows future expansion to modules
+without sacrificing backwards compatibility. When a module is opened
+the oldest acceptable version of that module should be specified. The
+module returned is guaranteed to be totally compatible with the
+specified version of the module, even if the module's current version
+is not the same. All the standard modules supplied with the system use
+the preprocessor constant @code{SYS_VER} to define their current
+version number. If this constant is used as the version number to
+@code{open_module} the system header files are guaranteed to be
+compatible with the opened module.
+
+Most modules are stored on disk, when one is opened it is loaded into
+the system by the kernel. Modules stored like this have a special file
+structure (@pxref{Module Files}) and are stored in the @file{/lib}
+directory of the filing system.
+
+@deftypefn {kernel Function} {struct module *} open_module (const char *@var{name}, u_short @var{version})
+This function attempts to obtain a handle on the module called
+@var{name}. The version number of the module must be at least @var{version}.
+If no such module is already loaded it tries to load it from disk. If
+it can find the module it calls its @code{open} function and returns
+the result: either a pointer to the module's structure or a null
+pointer.
+@end deftypefn
+
+@deftypefn {kernel Function} void close_module (struct module *@var{mod})
+This function releases the handle to the previously opened module,
+@var{mod}.
+@end deftypefn
+
+Note that the result of @code{open_module} will need to be cast to the type
+of the module being opened and then when it is closed the parameter to
+the @code{close_module} will need to be cast to @code{struct module *}.
+For example to open and then close the filing system module something
+like the following would be necessary:
+
+@example
+#include <vmm/kernel.h>
+#include <vmm/fs.h>
+
+struct fs_module *fs;
+
+@dots{}
+
+    /* The result of this function is of type
+       `struct module *'. It actually points to the
+       first member of the filing system module and
+       therefore may be cast to that type. */
+    fs = (struct fs_module *)kernel->open_module("fs", SYS_VER);
+    if(fs != NULL)
+    @{
+        /* Use the filing system */
+        @dots{}
+
+        /* close_module() needs an argument of
+           type `struct module *' so cast it back. */
+        kernel->close_module((struct module *)fs);
+    @}
+@end example
+
+Once a pointer to the module's structure has been obtained it is
+possible to reference the functions and data objects exported by the
+module. These are all fields of the module's structure and therefore
+should be reference with the C @code{->} operator. For example:
+
+@example
+#include <vmm/fs.h>
+
+/* A pre-initialised pointer to the filing system
+   module. */
+extern struct fs_module *fs;
+
+@dots{}
+
+    struct file *fh;
+    /* Use the `open' function in the filing system
+       module to open a file. */
+    fh = fs->open("foo", F_READ);
+    if(fh != NULL)
+    @{
+        /* Use the file `fh' */
+        @dots{}
+
+        /* Now close the file with the `close'
+           function. */
+        fs->close(fh);
+    @}
+@end example
+
+@deftypefn {kernel Function} bool expunge_module (const char *@var{name})
+Attempts to ensure that the module called @var{name} is not resident
+in memory. If it's not, or it has now been unloaded, the value
+@code{TRUE} is returned, otherwise @code{FALSE} if it is still
+resident.
+@end deftypefn
+
+@node Module Structure, Creating Modules, Using Modules, Modules
+@subsection The Module Structure
+@cindex Module structure
+
+The @code{struct module} is the base type which each module derives
+its own module structure from, it looks like:
+
+@tindex struct module
+@example
+struct module @{
+    struct module *next;
+
+    /* The name of this module. */
+    const char *name;
+
+    /* The version of this module. */
+    u_short version;
+
+    /* The reference-count of this module. */
+    short open_count;
+
+    /* The location and extent of the module. */
+    char *mod_start;
+    size_t mod_size;
+
+    /* Called when the module is loaded. */
+    bool (*init)(void);
+
+    /* Called each time the module is opened. */
+    struct module *(*open)(void);
+
+    /* Called when the module is closed. */
+    void (*close)(struct module *mod);
+
+    /* Called when the module might be unloaded. */
+    bool (*expunge)(void);
+
+    /* TRUE if the module is statically linked. */
+    bool is_static;
+@};
+@end example
+
+The following function descriptions document the behaviour expected of
+the functions in this structure.
+
+@deftypefn {module Function} bool init (void)
+This function (if it's not a null pointer) is called when the module
+is loaded. If the module is able to successfully initialise itself it
+should return @code{TRUE}, otherwise @code{FALSE}.
+@end deftypefn
+
+@deftypefn {module Function} {struct module *} open (void)
+This function is called each time the module is opened. Normally the
+action of this function is simply to increment the @code{open_count}
+field of its module structure and return a pointer to the same
+structure. In fact if the @code{open} function is a null pointer this
+is what is done by default.
+
+If for some reason the module does not want to allow itself to be
+opened it should return a null pointer.
+@end deftypefn
+
+@deftypefn {module Function} void close (struct module *@var{mod})
+This function is called each time the module is closed, @var{mod} is a
+pointer to the module's module structure. Usually the module simply
+decrements its @code{open_count} and returns; this is what happens if
+the function is defined as a null pointer.
+@end deftypefn
+
+@deftypefn {module Function} bool expunge (void)
+This function is called when someone attempts to expunge the module
+from memory. If references to the module are still outstanding the
+function should always return @code{FALSE}, signifying that the module
+may not be expunged.
+
+If the module may be expunged it should deallocate any resources it
+has allocated and return @code{TRUE}. If the function is defined as a
+null pointer the module will never be expunged.
+@end deftypefn
+
+The macro @code{MODULE_INIT} is used to define an instance of the
+module structure in C source files.
+
+@defmac MODULE_INIT (name, version, init, open, close, expunge)
+This macro expands to an instance of a @code{struct module} with each
+parameter being used to initialise the field in the structure of the
+same name.
+
+For example:
+
+@example
+MODULE_INIT ("foo", 1, foo_init, NULL, NULL, foo_expunge) @expansion{}
+  @{ NULL, "foo", 1, 0, NULL, 0,
+    foo_init, NULL, NULL, foo_expunge @}
+@end example
+@end defmac
+
+@node Creating Modules, Module Files, Module Structure, Modules
+@subsection Creating Modules
+@cindex Creating modules
+@cindex Modules, creating
+
+It is fairly straightforward to define and create a new module. The C
+source code for each module is stored in a separate directory and each
+module defines its own module structure in a header file, for example:
+
+@example
+struct foo_module @{
+    struct module base;
+    int (*an_exported_function) (int bar);
+    int an_exported_variable;
+@};
+@end example
+
+@noindent
+Then in one of its source code files, an instance of this structure
+@emph{with the same name as the structure} is defined, for example:
+
+@example
+struct foo_module foo_module = @{
+    MODULE_INIT("foo", foo_init, NULL, NULL, foo_expunge),
+    the_exported_function,
+    0
+@};
+@end example
+
+@noindent
+In the same place each module must define an uninitialised pointer to
+the kernel module called @code{kernel} (@pxref{Kernel Module}), this
+looks like:
+
+@example
+struct kernel_module *kernel;
+@end example
+
+@noindent
+This pointer will be automatically initialised when the module is
+loaded. Modules statically linked with the kernel will share one
+instance of this pointer (@pxref{Static Modules}).
+
+All functions exported by a module @emph{must be reentrant}. Since the
+system is totally preemptable functions must be written with great care,
+especially when global variables are being accessed. Often, the use
+of @code{forbid} and @code{permit} statements can make writing reentrant
+functions a lot easier.
+
+The file of make definitions @file{Makedefs} in the top-level
+directory of the source tree contains rules to build a @file{.module}
+file from a collection of object files. This makes linking modules
+very easy: in a Makefile simply have a rule making the module file
+depend on the object files to build it from. For example, the shell
+uses the following text as its @file{Makefile}:
+
+@example
+SRCS = shell.c command.c cmds.c
+OBJS = $(SRCS:.c=.o)
+
+all : shell.module
+
+TOPDIR = ..
+include $(TOPDIR)/Makedefs
+
+CFLAGS += -DSHELL_MODULE
+
+shell.module : $(OBJS)
+
+clean :
+	rm -f *~ *.[od] shell.module core *.map
+
+include $(SRCS:.c=.d)
+@end example
+
+@node Module Files, Static Modules, Creating Modules, Modules
+@subsection Module Files
+@cindex Module files
+
+Modules that are stored in files in the filing system use a special
+file structure to allow the module loader to be as efficient as
+possible. Basically, each module file consists of a header, a chunk of
+initialised code and data, and a list of relocations to perform on
+this chunk to allow it to work at the address that it has been loaded
+at. The header is defined by the following structure:
+
+@example
+struct mod_hdr @{
+    /* A magic number so the loader can
+       check if this *is* a module file. */
+    u_short magic;
+
+    /* The revision number of the module's
+       file structure. */
+    u_char revision;
+
+    u_char reserved1;
+
+    /* The length of the section of initialised
+       code and data located at the end of this
+       header. */
+    u_long init_size;
+
+    /* The length of the uninitialised data
+       section (set to zeros when the module is
+       loaded). */
+    u_long bss_size;
+
+    /* The length of the relocation data stored
+       after the initialised data. */
+    u_long reloc_size;
+
+    /* Pads the structure to be 48 bytes long
+       for easy future expansion. */
+    u_char reserved2[32];
+@};
+@end example
+
+As well as this header structure each module has another header at the
+beginning of its initialised code and data. When the module is loaded
+this header is used to initialise the module.
+
+@example
+struct mod_code_hdr @{
+    /* A pointer to the module's module
+       structure. */
+    struct module *mod_ptr;
+
+    /* A pointer to this module's pointer to the
+       kernel module. It will be initialised after
+       the module has been loaded. */
+    struct kernel_module **kernel_ptr;
+
+    /* Points to the end of this module's initialised
+       code and data section. Used when the module is
+       linked statically with the kernel to form a
+       linked list of all static modules. */
+    struct mod_code_hdr *next_mod;
+@};
+@end example
+
+Note that all of these structure are created by the build
+procedure for modules defined in the @file{Makedefs} file
+(@pxref{Creating Modules}), the programmer doesn't have to worry about
+them at all.
+
+@node Static Modules, Kernel Module, Module Files, Modules
+@subsection Statically Linked Modules
+@cindex Static modules
+@cindex Modules, static
+
+It is often useful to be able to link modules with the kernel at
+compile time, instead of dynamically loading them from disk as they
+are required. In fact, it's essential since the filing system and disk
+drivers are modules --- how could they be loaded from disk? The module
+system has been designed specifically with this in mind to overcome
+the problem.
+
+The standard rule to build a module file also leaves an a.out object
+file in the build directory along with the module file. This object
+file (called @file{foo.module.o} for a module file @file{foo.module})
+can be linked with the kernel by simply adding its name (relative to
+the top of the source tree) in the file @file{STATIC} in the top-level
+source directory.
+
+To eliminate the possibility of symbol-name clashes between statically
+linked modules, the a.out versions of module files have all symbols
+but for their @code{kernel} variable and their module structure
+stripped from the object file with a special tool.
+
+When the kernel initialises itself it traverses through the list of
+statically linked modules calling each one's initialisation function
+in order.
+
+The result of all this is that modules do not need to be tailored to
+being dynamically or statically linked: the two methods of loading the
+module are both totally compatible with one another. It should be
+noted however that the order of entries in the @file{STATIC} file is
+significant: if a module in the list attempts to open a module further
+down the list in its initialisation function it will fail (since the
+module to be opened is still uninitialised).
+
+@node Kernel Module, , Static Modules, Modules
+@subsection The Kernel Module
+@cindex Kernel module
+@cindex Modules, kernel
+
+The functions that the kernel exports can be accessed through the
+@samp{kernel} module. This is not a normal module --- it is not stored
+in a standard module file. Instead, when the kernel initialises itself
+it creates a module structure for itself.
+
+Every other module is given a pointer to the kernel module in its
+variable called @code{kernel} when it is loaded. It is not possible for
+modules to open the kernel module themselves since they need to be
+able to call the @code{open_module} function, which is stored in the
+kernel module.
+
+@node Interrupts, Exception Handling, Modules, Kernel
+@section Interrupts
+@cindex Interrupts
+
+Interrupts are caused by external devices; when the processor receives
+an IRQ (Interrupt Request) from the interrupt controller it transfers
+control to a special piece of code --- an interrupt handler. Interrupt
+handlers come in two flavours: immediate and queued, immediate
+interrupt handlers are called as soon as the IRQ is received,
+asynchronously to the context, this imposes stringent restrictions on
+what an interrupt handler of this type may do. Queued interrupt
+handlers do not have these restrictions but incur more of an overhead.
+
+@menu
+* Disabling Interrupts::
+* Interrupt Handlers::
+* Queued Interrupts::
+@end menu
+
+@node Disabling Interrupts, Interrupt Handlers, , Interrupts
+@subsection Disabling Interrupts
+@cindex Disabling interrupts
+@cindex Interrupts, disabling
+
+Since interrupts are by their nature asynchronous to the normal flow
+of control, problems will arise if an interrupt occurs while a
+sensitive operation is in progress. For example, imagine if a kernel
+function and an interrupt handler both modify a kernel data structure,
+say a linked list, and the interrupt handler is called while the kernel
+function is in the middle of modifying the list structure. In
+this case the interrupt handler may be able to access the list while
+it is in an inconsistent state, possibly causing huge problems.
+
+For this reason the kernel allows the disabling of interrupts; it is
+up to the piece of code disabling them to enabled them again as soon
+as possible to keep IRQ handling delays as small as possible.
+
+All the macros documented in this section are defined in the header
+file @file{<vmm/io.h>}.
+
+@defmac cli ()
+This macro expands to a statement that clears the processor's
+interrupt-enable flag (using the @code{CLI} instruction) to disable
+all external interrupts.
+@end defmac
+
+@defmac sti ()
+This macro expands to a statement that sets the processor's
+interrupt-enable flag (using the @code{STI} instruction) to enable
+external interrupts.
+@end defmac
+
+The way to protect a piece of code from an interrupt occurring in the
+middle of it (i.e. to make it ``atomic'') is to bracket it with
+@code{cli} and @code{sti} macros. For example:
+
+@example
+struct list_item *head;
+struct list_item *item;
+
+/* Disable interrupts, while modifying the
+   linked list. */
+cli();
+
+/* Push `item' onto the top of the
+   list `head'. */
+item->next = head;
+head = item;
+
+/* Now we can enable them again. */
+sti();
+@end example
+
+It is often useful to save the current status of the interrupt-enable
+flag so that it can be reset to its original state after being
+disabled. This is necessary in functions that may be called from
+interrupt handlers or the normal kernel context that wish to disable
+interrupts (since interrupt handlers are called with interrupts
+disabled).
+
+@defmac save_flags (flags-var)
+This macro expands to a statement that saves the current value of the
+@code{EFLAGS} register to the 32-bit integer variable named by the
+parameter @var{flags-var}.
+@end defmac
+
+@defmac load_flags (flags-var)
+This macro expands to a statement that loads the @code{EFLAGS}
+register from the value stored in the 32-bit integer variable named by
+the parameter @var{flags-var}.
+@end defmac
+
+If the example code fragment above could be called with interrupts
+either disabled (i.e. from an interrupt handler) or enabled, it could
+be rewritten as:
+
+@example
+/* Temporary storage of the EFLAGS
+   register. */
+u_long flags;
+
+struct list_item *head;
+struct list_item *item;
+
+/* First save the old value of the
+   interrupt-enable flag. */
+save_flags(flags);
+
+/* Disable interrupts, while modifying the
+   linked list. */
+cli();
+
+/* Push `item' onto the top of the
+   list `head'. */
+item->next = head;
+head = item;
+
+/* Now reload EFLAGS with its old value. */
+load_flags(flags);
+@end example
+
+Note that this idea of disabling interrupts while performing delicate
+operations can sometimes be replaced by only disabling task
+preemption (with @code{forbid}) if the data structure being modified
+can't be accessed by interrupt handlers, only by other tasks.
+@xref{Task Preemption}.
+
+@node Interrupt Handlers, Queued Interrupts, Disabling Interrupts, Interrupts
+@subsection Interrupt Handlers
+@cindex Interrupt handlers
+
+The kernel allows C functions to be installed as IRQ handler
+functions. Special assembly-language stub functions are installed by
+the kernel as the physical interrupt handlers, they handle all the
+messy business of communicating with the interrupt controllers and
+call the C function installed on the IRQ that occurred. They also send
+the interrupt-acknowledge code to the correct controller(s) when
+necessary. This allows interrupt handlers to be implemented and
+installed very easily.
+
+@deftypefn {kernel Function} bool alloc_irq (u_int @var{irq}, void *@var{handler}, char *@var{name})
+This function installs the C handler function at location
+@var{handler} to handle all interrupt requests of type @var{irq}. The
+string @var{name} should describe the device causing this interrupt
+request; it is used by the @code{sysinfo} shell command.
+
+If the IRQ @var{irq} is available for use the value @code{TRUE} is
+returned, otherwise (a function is already handling the IRQ)
+@code{FALSE} is returned.
+
+All interrupts are disabled while an interrupt handler is executing,
+the @code{sti} instruction can enable them but this may have
+disastrous consequences (in some cases nested interrupts may occur).
+@end deftypefn
+
+@deftypefn {kernel Function} void dealloc_irq (u_int @var{irq})
+Remove the function handling the interrupt request @var{irq}, this
+handler will previously have been installed by the @code{alloc_irq}
+function.
+@end deftypefn
+
+Interrupt handlers are very restricted in the actions they may
+perform (because functions which may be called from interrupt handlers
+must protect any access to shared data structures if they may also be
+called from the general kernel context). Unless a function explicitly
+states that it may be called by interrupt handlers in its
+documentation it @emph{may not} be called by an interrupt handler.
+
+A consequence of this is that interrupt handlers are unable to change
+the task currently executing (since @code{schedule} may not be called by
+interrupt handlers), this means that interrupt handlers are totally
+non-preemptable. If possible (without losing too much performance) try
+to use queued interrupt handlers, they suffer none of these problems.
+
+@node Queued Interrupts, , Interrupt Handlers, Interrupts
+@subsection Queued Interrupt Handlers
+@cindex Queued interrupt handlers
+@cindex Interrupts, queued handlers
+
+Queued interrupt handlers provide a method of removing the massive
+restrictions placed on normal (immediate) interrupt handlers, at the
+cost of a possible increase in the delay between the processor
+receiving the IRQ and the handler being dispatched.
+
+Instead of being called asynchronously to the normal kernel flow of
+control a queued interrupt handler is called in the context of a
+special task called the interrupt dispatcher task
+(@pxref{Task Handling}). This task, which runs at a very high
+priority, spends all its time waiting for queued interrupts to be
+received. When one does it is placed in a FIFO by an immediate
+interrupt handler and the irq dispatcher task is made runnable. As
+soon as the irq dispatcher is scheduled it takes the queued interrupt
+at the head of the FIFO and calls its handler.
+
+@deftypefn {kernel Function} bool alloc_queued_irq (u_int @var{irq}, void (*@var{func})(void), char *@var{name})
+This function is similar to @code{alloc_irq} except that the IRQ
+handler function @var{func} is installed as a queued interrupt handler
+of irq number @var{irq}. The @var{name} parameter is a string used
+when printing the IRQs currently in use.
+
+If the function succeeds the value @code{TRUE} is returned, otherwise
+if for some reason the IRQ can't be reserved @code{FALSE} is returned.
+@end deftypefn
+
+@deftypefn {kernel Function} void dealloc_queued_irq (u_int @var{irq})
+This function removes the queued interrupt handler previously
+installed on IRQ number @var{irq} by the @code{alloc_queued_irq}
+function.
+@end deftypefn
+
+@node Exception Handling, Memory Management, Interrupts, Kernel
+@section Exception Handling
+@cindex Exception handling
+
+An @dfn{exception} is similar to an interrupt in that it causes
+control to switch to a special function, the difference is that
+exceptions are always precipitated by the processor, not an external
+device. The 80386 defines 15 different types of exception that may
+occur, they are usually raised when the processor detects an error in
+the instruction that it is currently executing.
+
+For most of the types of exception the only possible action is to halt
+the task which caused the exception, the @code{dump_regs} function is
+used to do this.
+
+@deftypefn {kernel Function} void dump_regs (struct trap_regs *@var{regs} bool @var{halt})
+This function prints a register listing of the stack frame @var{regs}
+to the console, if the @code{CS:EIP} is in a module loaded from disk
+the name of the module and the offset into it is also printed to help
+in finding the error. If the @samp{debug} module is currently in
+memory its @code{ncode} function is used to disassemble the
+code surrounding the faulting instruction.
+
+If the @var{halt} parameter is @code{TRUE} the current task is halted,
+if the exception occurred inside an interrupt handler the only way to
+do this is by halting the entire system. Otherwise the current task is
+simply frozen. If @var{halt} is not @code{TRUE} the function returns
+normally.
+@end deftypefn
+
+The following table describes what the kernel does as it receives each
+of these 15 different types of exception.
+
+@table @asis
+@item Divide error
+Caused by an integer division by zero. If the @code{exceptions[0]}
+field of the current task is non-null this function is called,
+otherwise @code{dump_regs} is called to halt the task.
+
+@item Debug exceptions
+Caused by one of the processor's debugging aids. If the
+@code{exceptions[1]} field of the current task is non-null this
+function is called, otherwise if one of the breakpoints set by the
+@code{set_debug_reg} kernel function is activated a message to this
+effect is printed to the console and the task continues.
+
+@item Breakpoint
+Caused by the @code{INT 3} instruction. If the @code{exceptions[3]}
+field of the current task is non-null this function is called.
+Otherwise @code{dump_regs} is called to halt the task.
+
+@item Overflow
+Caused by the @code{INTO} instruction. If the @code{exceptions[4]}
+field of the current task is non-null this function is called.
+Otherwise @code{dump_regs} is called to halt the task.
+
+@item Bounds check
+Caused by the @code{BOUND} instruction. If the @code{exceptions[4]}
+field of the current task is non-null this function is called.
+Otherwise @code{dump_regs} is called to halt the task.
+
+@item Invalid opcode
+Caused by any illegal instruction. If the @code{exceptions[5]}
+field of the current task is non-null this function is called.
+Otherwise @code{dump_regs} is called to halt the task.
+
+@item Coprocessor not available
+Caused by the @code{ESC} and @code{WAIT} instructions. If the
+@code{exceptions[5]} field of the current task is non-null this
+function is called. Otherwise @code{dump_regs} is called to halt the
+task.
+
+@item Double fault
+Caused when some types of exception occur in some types of exception
+handler. The @code{dump_regs} function is used to halt the current
+task.
+
+@item Coprocessor segment overrun
+The task is halted by @code{dump_regs}.
+
+@item Invalid TSS
+The task is halted by @code{dump_regs}.
+
+@item Segment not present
+The task is halted by @code{dump_regs}.
+
+@item Stack exception
+The task is halted by @code{dump_regs}.
+
+@item General protection fault
+If the @code{gpe_handler} field of the current task is non-null this
+function is called to correct the fault, otherwise the task is halted
+by @code{dump_regs}.
+
+@item Page fault
+The page fault handler of the memory management subsystem is called,
+see @ref{Page Fault Handler}.
+
+@item Coprocessor error
+The task is halted by @code{dump_regs}.
+@end table
+
+@tindex struct trap_regs
+@tindex struct vm86_regs
+When a function is called by an exception handler it always gets
+passed a @code{struct trap_regs *} or a @code{struct vm86_regs *}
+parameter. This defines the register frame of the task when the
+exception occurred (see the header file @file{<vmm/traps.h>}),
+modifying the values of the fields in this structure also modifies the
+contents of the task's registers when it resumes execution. This
+allows exception handlers to emulate instructions which fault, advance
+the @code{EIP} register to the next instruction and then return
+execution to the task. This is how the @samp{vm} module does most of
+its virtualisation.
+
+@node Memory Management, Kernel Malloc, Exception Handling, Kernel
+@section Memory Management
+@cindex Memory management
+
+This section of the manual documents the way that the kernel manages
+memory throughout the system; including how it uses the processor's
+memory management hardware to construct the memory model which we
+designed for the system.
+
+The header files @file{<vmm/map.h>} and @file{<vmm/page.h>} contain
+the definitions used by by the memory management subsystem of the
+kernel.
+
+@menu
+* Types of Addresses::
+* System Memory Map::
+* Segment Functions::
+* Page Allocation::
+* Page Tables::
+* Page Fault Handler::
+@end menu
+
+@node Types of Addresses, System Memory Map, , Memory Management
+@subsection Types Of Addresses
+@cindex Types of addresses
+@cindex Addresses, types of
+@cindex Memory mangement, types of addresses
+
+The 80386 processor uses three main types of memory addresses,
+@dfn{physical}, @dfn{linear} and @dfn{logical} addresses.
+
+Logical addresses are the addresses used in microprocessor
+instructions to access memory locations. For example the C fragment
+below accesses the contents of the integer stored at logical address
+200.
+
+@example
+int foo;
+foo = *((int *)200);
+@end example
+
+Logical addresses are translated into linear addresses by the
+processor's segmentation hardware. Every memory access refers 
+(implicitly or explicitly) to a memory segment. To obtain the logical
+address's linear address the base address of the segment (a linear
+address) is added to the logical address. For example a logical
+address @var{x} in the kernel segment (beginning at linear address
+0xf8000000) has the linear address @code{0xf800000 + @var{x}}.
+
+Once a linear address has been obtained the physical address of the
+piece of memory it references is computed by the paging hardware of
+the processor. Each task is given a set of @dfn{page tables} which
+maps the linear addresses that it accesses into physical addresses.
+
+To sum up, the 80386 has a three stage memory addressing system: a
+logical address referenced by an instruction is translated into a
+linear address by segmentation, then this is in turn translated into a
+physical address by paging.
+
+@node System Memory Map, Segment Functions, Types of Addresses, Memory Management
+@subsection System Memory Map
+@cindex System memory map
+@cindex Memory map of the system
+
+There are an almost infinite number of ways in which an operating
+system can setup the processor's memory management hardware, each
+different way providing a different type of memory model for the
+system. The two main issues involved are segmentation and paging.
+Segmentation defines the mapping between logical and linear addresses,
+segments are normally used to separate (and protect) the different
+types of memory that are in the system. Paging is concerned with mapping
+linear addresses to the actual memory in the system (physical
+addresses). The header file @file{<vmm/map.h>} defines the macros and
+structures talked about in this section.
+
+For our system we decided to use two main segments, a user segment and
+a kernel segment (in fact each of these is actually two segments --- a
+code segment and a data segment, both with the same base and limit).
+The kernel segment is where all kernel code and data is stored; it is
+only accessible to the most highly privileged tasks. The user segment
+is used to store user code and data (i.e. virtual machines). The
+following diagram attempts to show how the two segments are defined in
+the four gigabyte address space of the 80386:
+
+@example
+       4G +-----------------------+
+          |  Kernel space         |
+4G - 128M +-----------------------+
+          |                       |
+          |                       |
+          ~                       ~
+          |                       |
+          |                       |
+          |  User space           |
+          |                       |
+        0 +-----------------------+
+@end example
+
+@noindent
+As you can see the kernel segment is 128M long ending at the top of the
+processor's address space (so it starts at 0xf8000000). All the rest
+of the address space is available for user programs.
+
+Two macros are provided to covert between linear addresses and address
+in the kernel segment.
+
+@defmac TO_LINEAR (x)
+This macro expands to the linear address of the logical address in the
+kernel segment @var{x}. Basically it just adds the base of the kernel
+segment to @var{x}. The resulting value will be of type @code{u_long}.
+@end defmac
+
+@defmac TO_KERNEL (x)
+This macro expands to the logical address in the kernel segment of the
+linear address @var{x} (which must be an integer type). This simply
+subtracts the base of the kernel segment from @var{x}. If @var{x} is
+actually in the user segment unexpected things may happen!
+@end defmac
+
+These segments provide a framework upon can be hung the memory model
+of our system. Each task is given its own set of page tables to allow
+it to have its own user segment. The page tables mapping the kernel
+segment are shared by all tasks, meaning that the kernel logical
+address space is constant throughout the system. The actual layout of
+logical addresses in the kernel segment is as follows:
+
+@example
+     128M +-----------------------+
+          |                       |
+          ~                       ~
+          |                       |
+          +- - - - - - - - - - - -+
+          | Mapping of all        |
+          | physical memory in    |
+          | the system.           |
+       8M +-----------------------+
+          |                       |
+          ~                       ~
+          |                       |
+          | Dynamic kernel        |
+          | code and data.        |
+          +- - - - - - - - - - - -+
+          | Static kernel         |
+          | code and data.        |
+       4K +-----------------------+
+          | Null page.            |
+        0 +-----------------------+
+@end example
+
+@noindent
+Dotted lines denote boundaries which aren't fixed: they are set by the
+initialisation process.
+
+Working from the bottom of the diagram upwards, the Null page is used
+to catch all null pointer dereferences made by the kernel; the first
+page in the kernel segment is simply left unmapped.
+
+After the Null page the next part of the kernel segment is used to
+contain the statically linked kernel, loaded by the system loader at
+startup. The space between the top of the static kernel and the eight
+megabyte mark is used for dynamic memory allocation by the kernel: as
+more kernel memory is required the @code{kernel_sbrk} function simply
+pushes up the top of the kernel and allocates new memory pages to map
+into the newly-reserved space.
+
+Directly above the eight megabyte mark is a mapping of all the
+physical memory in the system. This allows the kernel to access any
+piece of physical memory in the system simply by offsetting into this
+region. It is necessary to do this since the physical address of a
+piece of memory @emph{is not} the same as its logical address, to try
+to avoid any confusion throughout the kernel physical addresses are
+defined as being of type @code{u_long} instead of a pointer to prevent
+physical addresses being accessed.
+
+Two macros have been defined to convert between the physical address
+of a piece of memory and its logical address in the map of physical
+memory.
+
+@defmac TO_LOGICAL (x, t)
+This macro converts the physical address @var{x} of a piece of memory
+to a logical address of type @var{t} which may be used in the kernel
+segment to access the piece of memory (i.e. a pointer into the map of
+physical memory).
+
+For example to access the integer stored at physical address 200, the
+following code fragment could be used:
+
+@example
+int foo;
+foo = *TO_LOGICAL(200, int *);
+@end example
+@end defmac
+
+@defmac TO_PHYSICAL (x)
+This macro converts the logical address @var{x} pointing into the
+map of physical memory to the actual physical address (of type
+@code{u_long}) of the piece of memory.
+@end defmac
+
+@node Segment Functions, Page Allocation, System Memory Map, Memory Management
+@subsection Segment Functions
+@cindex Segment functions
+@cindex Memory management, segment functions
+
+As described in the previous section the system uses two segments: a
+kernel segment and a user segment. The kernel often needs to address
+objects stored in the user segment of the current task, the way to do
+this is by using the processor's segment prefix opcode to explicitly
+specify the segment used by an instruction. When running in kernel
+mode the system ensures that the @code{FS} segment register always
+contains a selector for the user segment, the following inline
+functions use it to operate on the current task's user segment.
+
+@deftypefun {inline void} put_user_byte (u_char @var{val}, u_char *@var{ptr})
+Store the byte @var{val} at address @var{ptr} in the user segment.
+@end deftypefun
+
+@deftypefun {inline void} put_user_short (u_short @var{val}, u_short *@var{ptr})
+Store the 2-byte value @var{val} at address @var{ptr} in the user
+segment.
+@end deftypefun
+
+@deftypefun {inline void} put_user_long (u_long @var{val}, u_long *@var{ptr})
+Store the 4-byte value @var{val} at address @var{ptr} in the user
+segment.
+@end deftypefun
+
+@deftypefun {inline u_char} get_user_byte (u_char *@var{ptr})
+Return the byte stored at address @var{ptr} in the user segment.
+@end deftypefun
+
+@deftypefun {inline u_short} get_user_short (u_short *@var{ptr})
+Return the 2-byte value stored at address @var{ptr} in the user
+segment.
+@end deftypefun
+
+@deftypefun {inline u_long} get_user_long (u_long *@var{ptr})
+Return the 4-byte value stored at address @var{ptr} in the user
+segment.
+@end deftypefun
+
+@deftypefun {inline void *} memcpy_from_user (void *@var{to}, void *@var{from}, size_t @var{length})
+Copies @var{length} number of bytes from the address @var{from} in the
+user segment to the address @var{to} in the kernel segment. Note that
+@var{to} and @var{from} may not overlap. Returns the @var{to} pointer.
+@end deftypefun
+
+@deftypefun {inline void *} memcpy_to_user (void *@var{to}, void *@var{from}, size_t @var{length})
+Copies @var{length} number of bytes from the address @var{from} in the
+kernel segment to the address @var{to} in the user segment. Note that
+@var{to} and @var{from} may not overlap. Returns the @var{to} pointer.
+@end deftypefun
+
+@deftypefun {inline void *} memcpy_user (void *@var{to}, void *@var{from}, size_t @var{length})
+Copies @var{length} number of bytes from the address @var{from} in the
+user segment to the address @var{to} in the user segment. Note that
+@var{to} and @var{from} may not overlap. Returns the @var{to} pointer.
+@end deftypefun
+
+@deftypefun {inline void *} memset_user (void *@var{ptr}, u_char @var{val}, size_t @var{count})
+Sets @var{count} bytes starting at the address @var{ptr} in the user
+segment to the value @var{val}. Returns the value @var{ptr}.
+@end deftypefun
+
+@deftypefun {inline void *} memsetw_user (void *@var{ptr}, u_short @var{val}, size_t @var{count})
+Sets @var{count} words starting at the address @var{ptr} in the user
+segment to the value @var{val}. Returns the value @var{ptr}.
+@end deftypefun
+
+@deftypefun {inline void *} memsetl_user (void *@var{ptr}, u_long @var{val}, size_t @var{count})
+Sets @var{count} double words starting at the address @var{ptr} in the
+user segment to the value @var{val}. Returns the value @var{ptr}.
+@end deftypefun
+
+@node Page Allocation, Page Tables, Segment Functions, Memory Management
+@subsection Page Allocation
+@cindex Page allocation
+@cindex Memory management, page allocation
+
+The @dfn{page} is the basic unit of physical memory used by the
+system. Each page is four kilobytes in size, used in conjunction with
+page tables (@pxref{Page Tables}) they provide the pieces of physical
+memory related to a certain linear address.
+
+The lowest level unit of memory allocation in the system is the page;
+the kernel maintains a list of all the unused pages, as a new page is
+required one is removed from this list. When manipulating pages the
+kernel normally uses the @code{page} type to represent them, note that
+a @code{page *} type is actually a pointer into the map of physical
+memory.
+
+@tindex page
+@example
+typedef union _page @{
+    union _page *next_free;
+    char mem[PAGE_SIZE];
+@} page;
+@end example
+
+@deftypefn {kernel Function} {page *} alloc_page (void)
+This function allocates an unused page and returns a pointer to it, or
+a null pointer if no more free pages are available. This function may
+be called by interrupt handlers.
+
+Note that the pointer returned, if non-null, is a logical address
+pointing into the system's map of physical memory.
+@end deftypefn
+
+@deftypefn {kernel Function} void free_page (page *@var{page})
+Frees the page at logical address @var{page}. This function may be
+called from an IRQ handler or the normal kernel context.
+@end deftypefn
+
+@deftypefn {kernel Function} {page *} alloc_pages_64 (u_long @var{n})
+This function attempts to allocate a contiguous block of @var{n} pages
+starting on a 64K boundary. It also ensures that the area allocated is
+below the 16M boundary. If it's not already obvious, this function is
+designed for allocating DMA buffers with. This function may be called
+from interrupt handlers.
+
+If it is able to allocate a block its @emph{logical} address is
+returned, otherwise it returns a null pointer.
+@end deftypefn
+
+@deftypefn {kernel Function} void free_pages (page *@var{first}, u_long @var{n})
+Deallocates @var{n} pages starting with the page at logical address
+@var{first}. This function may be called by interrupt handlers.
+@end deftypefn
+
+@deftypefun void add_pages (u_long @var{start}, u_long @var{end})
+This function (local to the kernel module) is used to add a contiguous
+region of physical memory, between @var{start} and @var{end}, to the
+list of free pages. This function is used by the kernel's
+initialisation procedure to add all the available pages to the free
+list.
+@end deftypefun
+
+@node Page Tables, Page Fault Handler, Page Allocation, Memory Management
+@subsection Page Tables
+@cindex Page tables
+@cindex Memory management, page tables
+
+The 80386 uses a two-stage page table structure. The @code{CR3}
+register contains the physical address of the @dfn{page directory}
+currently being used, this is a page of memory divided into 32 bit 
+@dfn{page directory entries}. Each page directory entry contains the
+physical address of the @dfn{page table} used to map that portion of
+the address space, this is also a page divided into 32 bit entries,
+this time called @dfn{page table entries}. Each page table entry
+contains the physical address of the page of memory mapped into that
+address in the address space. So each page table maps four megabytes
+of the address space (since (1024 entries * 4096 bytes) equals 4M).
+
+The structure of page directory entries and page table entries (often
+simply called @dfn{pte's}) is the same. It looks like:
+
+@example
+    31              12  11    8               0
+   +------------------+------------------------+
+   | Page Address     |                   U R  |
+   |                  | Avail 0 0 D A 0 0 / / P|
+   |     31..12       |                   S W  |
+   +------------------+------------------------+
+@end example
+
+@noindent
+The individual fields are used in the following way:
+
+@table @code
+@item Page Address
+The highest twenty bits of the physical address of the page being
+pointed to by this entry.
+
+@item Avail
+Three bits available for use by the operating system. Our system
+currently only uses one --- bit nine is set if the page pointed to by
+this entry may be freed when the page table or directory is no longer
+being used.
+
+@item D
+The ``dirty'' bit, set by the memory management hardware when the page
+is modified.
+
+@item A
+The ``accessed'' bit, set when the page is referenced.
+
+@item U/S
+Defines whether the page may be accessed by user-level code. If set,
+it may.
+
+@item R/W
+Defines whether user-level code may write to the page, if set it may.
+
+@item P
+The ``present'' bit. When set the page mapped by this entry is able to
+be accessed, otherwise a not-present page fault is caused.
+@end table
+
+The kernel module exports the following functions to manipulate page
+directories and tables.
+
+@deftypefn {kernel Function} void map_page (page_dir *@var{pd}, page *@var{page}, u_long @var{addr}, int @var{flags})
+This function maps the page at logical address @var{page} (in the map
+of physical memory) to linear address @var{addr} in the page directory
+at logical address @var{pd} (in the map of physical memory). If a page
+is already mapped at the address and it is freeable it will be
+deallocated. The pte bits @var{flags} are bitwise-OR'ed with the
+physical address of @var{page} to construct the page table entry for
+the linear address.
+@end deftypefn
+
+@deftypefn {kernel Function} void set_pte (page_dir *@var{pd}, u_long @var{addr}, u_long @var{pte})
+This function sets the page table entry of the linear address
+@var{addr} in the page directory at logical address @var{pd} to the
+value @var{pte}. Note that the existing entry is simply overwritten; a
+page mapped by it will @emph{not} be freed.
+@end deftypefn
+
+@deftypefn {kernel Function} u_long get_pte (page_dir *@var{pd}, u_long @var{addr})
+Returns the page table entry corresponding to the linear address
+@var{addr} in the page directory @var{pd}. If no page table exists for
+this address the value zero will be returned (i.e. not present).
+@end deftypefn
+
+@deftypefn {kernel Function} u_long read_page_mapping (page_dir *@var{pd}, u_long @var{addr})
+Returns the physical address of the page mapped to linear address
+@var{addr} in the page directory @var{pd}. Returns zero if the page is
+unmapped.
+@end deftypefn
+
+@deftypefn {kernel Function} u_long lin_to_phys (page_dir *@var{pd}, u_long @var{lin_addr})
+Returns the physical address of the byte at linear address
+@var{lin_addr} in the page directory @var{pd}. Returns zero if that
+page is not present (unmapped).
+@end deftypefn
+
+@deftypefn {kernel Function} void put_pd_val (page_dir *@var{pd}, int @var{size},u_long @var{val}, u_long @var{lin_addr})
+This function writes either a byte, short, or long value @var{val}
+depending on @var{size} (either 1, 2 or 4) to the piece of memory at
+linear address @var{lin_addr} in the page directory @var{pd}.
+@end deftypefn
+
+@deftypefn {kernel Function} u_long get_pd_val (page_dir *@var{pd}, int @var{size}, u_long @var{lin_addr})
+Returns either the byte, short or long (depending on @var{size},
+either 1, 2 or 4) from the linear address @var{lin_addr} in the page
+directory @var{pd}.
+@end deftypefn
+
+@deftypefn {kernel Function} bool check_area (page_dir *@var{pd}, u_long @var{start}, size_t @var{extent})
+If the linear addresses from @var{start} to @var{start}+@var{extent}
+are all present (i.e. a page is mapped to that address) return
+@code{TRUE}. If any of the page frames in this range are unmapped
+return @code{FALSE}.
+@end deftypefn
+
+@deftypefun {page_dir *} make_task_page_dir (void)
+This function (local to the kernel module) creates and returns a new
+page directory for a task. Basically this is just a mapping of the
+kernel's page tables into the kernel segment; everything else is
+simply left unmapped. This function is used by the @code{add_task}
+function when it allocates a new task structure. @xref{Task Handling}.
+
+Note that since the kernel's page tables are preallocated and mapped
+into the page directory of every task the kernel's page layout is
+shared between all tasks.
+@end deftypefun
+
+@node Page Fault Handler, , Page Tables, Memory Management
+@subsection The Page Fault Handler
+@cindex Page fault handler
+@cindex Memory management, page fault handler
+
+The page fault handler is called each time a page fault exception
+occurs. Page faults are caused by either a page-level protection
+violation (i.e. a user task accessing kernel pages) or by an access of
+a page marked as being not-present. Each task is allowed to install
+its own secondary page fault handler, this is called by the page fault
+handler in certain circumstances.
+
+When the page fault is caused by a protection violation the current
+task is usually frozen with its register values printed to the
+console. If the task has installed a secondary page fault handler and
+the task was executing at user-level this handler will be called, if
+it returns the value @code{TRUE} the task is allowed to continue
+executing (the handler assumes that the problem has been fixed),
+otherwise it is frozen as normal.
+
+Page faults causes by a not-present page don't usually result in the
+task being frozen, this only happens if the task is executing at
+kernel level and the address being accessed is invalid for some
+reason. Otherwise the handler attempts to make the page present and
+let the task continue executing. If the task has installed a secondary
+page fault handler it is called; it should correct the problem itself.
+Otherwise the top level handler allocates a new page and maps it into
+the hole being accessed.
+
+@node Kernel Malloc, Task Handling, Memory Management, Kernel
+@section Dynamic Memory Allocation
+@cindex Dynamic memory allocation
+@cindex Kernel malloc
+@cindex Memory management, malloc
+
+The kernel needs a method dynamically allocating and deallocating
+areas of memory (logical addresses) of various sizes. For example the
+module loader needs to allocate a chunk of the kernel address for the
+module being loaded. To simplify matters the kernel uses a Unix style
+method of allocating memory: a @dfn{break address} is maintained, it
+points to the top of the kernel's logical address space. As more
+memory is needed the break address is advanced and new pages mapped
+into the area.
+
+@deftypefun {void *} kernel_sbrk (long @var{delta})
+This function (local to the kernel module) is used to control the
+kernel's break address. It is altered by the signed value @var{delta}
+before the original value is returned. A negative parameter has the
+effect of lowering the break address (i.e. deallocating the memory at
+the top of the kernel).
+@end deftypefun
+
+Since this function is compatible with the standard Unix @code{sbrk}
+function we are able to use a standard Unix @code{malloc} package with
+a minimum of changes. Currently we are using a version of GNU
+@code{malloc} which has been optimised for speed. The only changes
+required to it were to change @code{sbrk} to @code{kernel_sbrk} and to
+bracket parts of it with @code{forbid} and @code{permit} statements
+since it was not designed to be reentrant (@pxref{Task Preemption}).
+
+@deftypefn {kernel Function} {void *} malloc (size_t @var{size})
+Allocate an uninitialised area of kernel memory @var{size} bytes long
+and return a pointer to it, or a null pointer if the area could not be
+allocated.
+@end deftypefn
+
+@deftypefn {kernel Function} {void *} calloc (size_t @var{nelem}, size_t @var{size})
+Allocate an area of kernel memory, filled with zeros, which contains
+@var{nelem} elements, each element of size @var{size} bytes. Returns a
+pointer to the area of memory allocated, or a null pointer if the
+allocation failed.
+@end deftypefn
+
+@deftypefn {kernel Function} void free (void *@var{ptr})
+Deallocates the area of kernel memory pointed to by @var{ptr}. The
+area must have been allocated by either @code{malloc}, @code{calloc},
+@code{realloc} or @code{valloc}.
+@end deftypefn
+
+@deftypefn {kernel Function} {void *} realloc (void *@var{ptr}, size_t @var{size})
+Resize the given area to the new size, returning a pointer to the 
+(possibly moved) area, or a null pointer if the function failed.
+@end deftypefn
+
+@node Task Handling, Time and Date Handling, Kernel Malloc, Kernel
+@section Task Handling
+@cindex Task handling
+@cindex Process handling
+
+A @dfn{task} is a thread of control in the system; the system supports
+totally preemptive multi-tasking. Tasks are used throughout the system
+and can be used as the base of a more complex thread, for example the
+virtual machine monitor uses tasks to provide the basic context for
+each virtual machine.
+
+The header file @file{<vmm/tasks.h>} contains all the task-related
+definitions.
+
+@menu
+* Task Structure::
+* Task Creation::
+* Scheduler::
+* Task Preemption::
+* Task Lists::
+* Semaphores::
+@end menu
+
+@node Task Structure, Task Creation, , Task Handling
+@subsection The Task Structure
+@cindex Task structure
+@tindex struct task
+
+Each task is represented by an instance of the @code{struct task} data
+type. It contains all the information needed by the kernel about the
+particular task.
+
+@example
+struct task @{
+    /* Used by the scheduler to link the task
+       into the lists of running and suspended
+       tasks. */
+    list_node_t node;
+
+    /* Called on exit from interrupt and exception
+       handlers if non-null. */
+    void (*return_hook)(struct trap_regs *regs);
+
+    /* The Task State Segment of this task. */
+    struct tss tss;
+
+    /* A selector for the tss. */
+    u_int16 tss_sel, _pad1;
+
+    /* The process ID of this task and its
+       parent task. */
+    u_long pid, ppid;
+
+    /* The task's page directory. */
+    page_dir *page_dir;
+
+    /* It's level 0 stack. */
+    page *stack0;
+
+    /* It's level 3 stack. */
+    page *stack;
+
+    /* Bit mask of flags, see below. */
+    u_long flags;
+
+    /* The task's priority, 0 is normal. */
+    short pri, _pad2;
+
+    /* In 1024Hz ticks, the amount of CPU time
+       used by this task, the time at which it was
+       last scheduled and its quantum. */
+    u_long cpu_time, last_sched, quantum;
+
+    /* In 1024Hz ticks, the amount of time left
+       before this task should be preempted. */
+    long time_left;
+
+    /* Context switches to this task. */
+    u_long sched_count;
+
+    /* When +ve, task is non-preemptable */
+    int forbid_count;
+
+    /* The name of this task. */
+    const char *name;
+
+    /* The task's current directory and errno
+       value. */
+    struct file *current_dir;
+    int errno;
+
+    /* Exception handlers for this task. */
+    void (*exceptions[8])(struct trap_regs *regs);
+    void (*gpe_handler)(struct trap_regs *regs);
+    bool (*pfl_handler)(struct trap_regs *regs,
+                        u_long lin_addr);
+
+    /* Available for use by the `owner' of the task.
+       In virtual machines this always points to the
+       task's virtual machine structure. */
+    void *user_data;
+@};
+@end example
+
+@noindent
+The @code{flags} field is a bit mask made up of the following possible
+values.
+
+@vtable @code
+@item TASK_RUNNING
+This task is runnable (i.e. not suspended).
+
+@item TASK_FROZEN
+The task is suspended and may @emph{not} be restarted.
+
+@item TASK_ZOMBIE
+The task has been deleted but it's resources haven't yet been
+reclaimed.
+
+@item TASK_IMMORTAL
+The task can not be deleted.
+
+@item TASK_VM
+The task is being used to provide a virtual machine.
+@end vtable
+
+@deftypevr {kernel Variable} {struct task *} current_task
+This field of the kernel module always points to the task structure of
+the currently running task.
+@end deftypevr
+
+@node Task Creation, Scheduler, Task Structure, Task Handling
+@subsection Task Creation and Deletion
+@cindex Task creation
+@cindex Task deletion
+
+@deftypefn {kernel Function} {struct task *} add_task (void *@var{func}, u_long @var{flags}, short @var{pri}, const char *@var{name})
+This function creates a new task and returns a pointer to its task
+structure or a null pointer if an error occurred.
+
+The @var{func} parameter is the address of the instruction (in the
+kernel) which the task should begin executing at. @var{flags} is the
+bit-mask made up from suitable @code{TASK_} values (see the previous
+section). The parameter @var{pri} defines the priority of the task
+(for the scheduler), zero is average, negative values for low-priority
+tasks, positive values for high priority tasks. The string @var{name}
+is stored in the task's @code{name} field, @emph{no copy is made}.
+
+If the @code{TASK_RUNNING} bit of @var{flags} is not set the task will
+be created suspended; this is often very useful (for example virtual
+machines are tasks created in a suspended state, then the values in
+their tss are set to enable V86 mode).
+
+Each task is given two 4096 byte stacks, one for @code{tss.esp0} and
+the other for @code{tss.esp}. The stack of the current privilege
+level (@code{tss.esp}) has the address of the function
+@code{kill_current_task} pushed onto it. This makes tasks kill
+themselves when their outermost function exits.
+
+All tasks are given their own page directory (with the kernel's shared
+page tables installed) to give each task their own version of the user
+segment.
+
+The task's current directory is inherited from the current task.
+@end deftypefn
+
+@deftypefn {kernel Function} int kill_task (struct task *@var{task})
+This function deletes the task represented by the task structure
+@var{task}, if it can not be killed (perhaps its @code{TASK_IMMORTAL}
+bit is set) the value -1 is returned, otherwise the function returns
+the value zero.
+
+The task structure and its associated resources will be deallocated as
+soon as possible (if the task being killed is the current task, the
+task is turned into a zombie and the scheduler reclaims its resources).
+@end deftypefn
+
+@deftypefn {kernel Function} void kill_current_task (void)
+Delete the task currently executing, tasks are always allowed to
+commit suicide so their @code{TASK_IMMORTAL} is cleared. This function
+should @emph{never} return.
+@end deftypefn
+
+@node Scheduler, Task Preemption, Task Creation, Task Handling
+@subsection The Scheduler
+@cindex Scheduler
+@cindex Tasks, scheduling
+
+The scheduler selects which of the tasks that are ready to run is
+given the processor. Each task has a @dfn{quantum}, the number of
+1024Hz ticks that it is allowed to run for before the scheduler is
+called to select the next task. The runnable tasks are stored in a
+list called the @dfn{run-queue}, it is sorted by order of task
+priority: when the scheduler needs a task to run it simply pops the
+first task in the queue and schedules it for its quantum.
+
+Unlike some in schedulers, the priority levels given to each task are
+fixed, this means that high level tasks can lock out lower level tasks
+simply by remaining runnable. This is actually a good thing since it
+lets interactive tasks run at a high priority while background tasks
+or those that are normally CPU-bound (virtual machines) run at a lower
+priority. When a task becomes runnable that is of a higher priority
+than the currently executing task the current task is preempted,
+allowing the high priority task to execute immediately. This ensures
+that the system seems reactive to the user. 
+
+The CMOS 1024Hz timer is used to decrement the time-left of the
+current task each tick. When this value becomes zero the task has had
+its quantum of CPU time and the flag @code{need_resched} is set. This
+flag is checked by the interrupt handler's return procedure, if it is
+set and it's safe to call the scheduler the scheduler is called to
+select the next task.
+
+@deftypefn {kernel Function} void schedule (void)
+The scheduler. It takes the task at the front of the run-queue and
+switches to its context.
+
+The actions performed by the scheduler are as follows:
+
+@enumerate
+@item
+Check for any zombie tasks (killed but not reclaimed), reclaim any
+such tasks. A task is only made into a zombie when it tries to kill
+itself (since it's impossible for a task to free all of its own
+resources).
+
+@item
+Check the @code{forbid_count} of the task, if it's greater than zero
+the task is non-preemptable and the scheduler exits immediately.
+
+@item
+Reset the value of the @code{need_resched} variable.
+
+@item
+If the current task is still runnable enqueue it in the run-queue (at
+the end of its priority level).
+
+@item
+Take the task at the head of the run queue.
+
+@item
+If its @code{time_left} field isn't greater than zero set it to the
+task's quantum.
+
+@item
+If the task isn't the current task: if it's a zombie add it to the
+scheduler's list of these, increment its @code{sched_count} field,
+update the @code{last_sched} field, set the @code{current_task}
+variable and switch to the new task with a @code{JMP TSS} instruction.
+@end enumerate
+
+Note that the scheduler should @emph{never} be called by an interrupt
+handler.
+@end deftypefn
+
+@deftypefn {kernel Function} void suspend_task (struct task *@var{task})
+If the task @var{task} is running, set it's state to suspended and put
+it into the list of suspended tasks. This function may be called from
+interrupts. Note that even if @var{task} is the current task this
+function doesn't call the scheduler itself, so it will return
+immediately (unless the task gets preempted).
+@end deftypefn
+
+@deftypefn {kernel Function} void suspend_current_task (void)
+Suspend the current task immediately, note that this @emph{may not} be
+called from an interrupt handler.
+@end deftypefn
+
+@deftypefn {kernel Function} void wake_task (struct task *@var{task})
+If the task @var{task} is suspended change its state to running and
+enqueue it in the run queue. This function may be called from
+interrupts. 
+@end deftypefn
+
+@node Task Preemption, Task Lists, Scheduler, Task Handling
+@subsection Task Preemption
+@cindex Task preemption
+@cindex Preemption of tasks
+
+As you might have realised from the previous section our system
+implements a @emph{fully} preemptive multi-tasking model. This means
+that tasks are preempted whenever their quantum runs out, without them
+even knowing anything about it.
+
+This can cause problems if the task is in the middle of accessing a
+shared data structure when it gets preempted. This is a very similar
+situation to that discussed in the section on disabling interrupts
+(@pxref{Disabling Interrupts}), and the solution is similar as well.
+Two special functions are provided to disable and enable preemption of
+the current task; code that wishes to be atomic with respect to being
+preempted can simply bracket itself with these functions. They are
+inline functions designed to be as quick as possible (all they do is
+increment and decrement a field in the task structure).
+
+@deftypefun {inline void} forbid (void)
+This inline function increments the current task's @code{forbid_count}
+field, thereby stopping the scheduler from preempting the task. The
+task is still able to suspend itself though.
+@end deftypefun
+
+@deftypefun {inline void} permit (void)
+This decrements the @code{forbid_count} of the current task, if it's
+new value is zero and the task should have been preempted while
+preemption was disabled the scheduler is called.
+@end deftypefun
+
+@node Task Lists, Semaphores, Task Preemption, Task Handling
+@subsection Task Lists
+@cindex Task lists
+
+A @dfn{task list} is a data structure used to contain a list of tasks,
+they are usually used to represent lists of @emph{suspended} tasks.
+One of the ways in which they are used is to form the basis of the
+system's semaphore type (@pxref{Semaphores}).
+
+Each node in a list of tasks is represented by an instance of the
+following structure:
+
+@tindex struct task_list
+@example
+struct task_list @{
+    struct task_list *next;
+    struct task *task;
+    u_long pid;
+@};
+@end example
+
+@noindent
+The @code{pid} field contains the ID of the task stored in the node,
+it is used for consistency checking, to ensure that the task in the
+node hasn't been killed while it was in the list.
+
+@deftypefn {kernel Function} void add_task_list (struct task_list **@var{head}, struct task_list *@var{elt})
+Add the task in the task-list element @var{elt} to the tail of the
+list of tasks pointed to by @var{head}.
+
+Note that only the @code{next} field of @var{elt} is modified,
+@code{task} should have been pointed at a task structure and
+@code{pid} set to the ID of the task.
+@end deftypefn
+
+@deftypefn {kernel Function} void remove_task_list (struct task_list **@var{head}, struct task_list *@var{elt})
+Remove the task contained in the element @var{elt} from the list of
+tasks pointed to by @var{head}.
+@end deftypefn
+
+@deftypefn {kernel Function} void sleep_in_task_list (struct task_list **@var{head})
+Put the current task to sleep in the list of tasks pointed to by
+@var{head}. 
+
+Note that since this calls the @code{schedule} function it may not be
+called by interrupt handlers.
+@end deftypefn
+
+@deftypefn {kernel Function} void wake_up_task_list (struct task_list **@var{head})
+Wake up all tasks contained in the task-list pointed to by @var{head}
+then set the list to be empty. Note that tasks are only awoke if the 
+@code{pid} field of the element is the same as the task's ID.
+@end deftypefn
+
+@deftypefn {kernel Function} void wake_first_task (struct task_list **@var{head})
+Remove the first element in the list of tasks pointed to by @var{head}
+then wake up the task contained in that element (but only if its
+@code{pid} field matches).
+@end deftypefn
+
+@node Semaphores, , Task Lists, Task Handling
+@subsection Semaphores
+@cindex Semaphores
+@cindex Tasks, semaphores
+
+A @dfn{semaphore} is a data structure used to synchronise a group of
+tasks, it has two states, blocked and not blocked. When a task wishes
+to enter a critical code section it must obtain the semaphore
+associated with that section. If the semaphore is not blocked this
+happens immediately and the semaphore is set to blocked until the task
+leaves the critical section. If the semaphore is blocked however, the
+task cannot obtain the semaphore (and therefore enter the critical
+section) since another task currently has possession of the
+semaphore. The task wishing to enter the section is suspended until
+the semaphore once more becomes available, when it may obtain the
+semaphore and enter the critical section, safe in the knowledge that no
+other tasks are also executing in the same section of code.
+
+Each semaphore is represented by one of the following structures:
+
+@tindex struct semaphore
+@example
+struct semaphore @{
+    /* Non-zero when the semaphore is blocked. */
+    int blocked;
+
+    /* A list of the tasks currently waiting to
+       take possession of the semaphore. */
+    struct task_list *waiting;
+@};
+@end example
+
+All of the following functions are defined as inline functions, so
+they are not found in the kernel module. They are defined in the
+@file{<vmm/tasks.h>} header file and can be called by their name,
+without any module prefix.
+
+@deftypefun {inline void} wait (struct semaphore *@var{sem})
+Request ownership of the semaphore @var{sem}, the current task will
+sleep until it becomes available. This function may @emph{not} be
+called by interrupt handlers.
+
+If a task attempts to @code{wait} for a semaphore which it already
+owns a deadlock will occur!
+@end deftypefun
+
+@deftypefun {inline void} signal (struct semaphore *@var{sem})
+The current task releases its ownership of the semaphore @var{sem}.
+This may be called from interrupts.
+@end deftypefun
+
+@deftypefun {inline void} set_sem_clear (struct semaphore *@var{sem})
+Initialise the semaphore @var{sem} so that it is not blocked.
+@end deftypefun
+
+@deftypefun {inline void} set_sem_blocked (struct semaphore *@var{sem})
+Initialise the semaphore @var{sem} so that it @emph{is} blocked.
+@end deftypefun
+
+@node Time and Date Handling, Timers, Task Handling, Kernel
+@section Time And Date Handling
+@cindex Time and date handling
+@cindex Date and time handling
+
+The kernel is responsible for handling date and time values, it uses
+an integer data type @code{time_t} to represent these values, storing
+them as the number of seconds elapsed since January 1st 1970 
+(sometimes called the @dfn{epoch}). @xref{System Types}.
+
+@deftypefn {kernel Function} time_t current_time (void)
+Returns an integer representing the current time and date.
+@end deftypefn
+
+From a given @code{time_t} value it is possible to compute the
+individual time and date components (i.e. the month, hour, etc@dots{})
+using the @code{expand_time} kernel function and the data type
+@code{struct time_bits} defined in the header file @file{<vmm/time.h>}.
+
+@tindex struct time_bits
+@example
+struct time_bits @{
+    /* The year, eg. 1995 */
+    int year;
+
+    /* The month, Jan==1 ... */
+    int month;
+
+    /* The full and abbreviated (to three
+       characters) name of the month. */
+    const char *month_name;
+    const char *month_abbrev;
+
+    /* The day of the month, starting at
+       one. */
+    int day;
+
+    /* The day of the week, Mon==0 ... */
+    int day_of_week;
+
+    /* The full and abbreviated (to three
+       characters) name of the day of the
+       week. */
+    const char *dow_name;
+    const char *dow_abbrev;
+
+    /* The current time. */
+    int hour, minute, second;
+@};
+@end example
+
+@deftypefn {kernel Function} void expand_time (time_t @var{time}, struct time_bits *@var{bits})
+This function fills in all the fields of the structure pointed to by
+@var{bits} so that they describe the time and date value @var{time}.
+@end deftypefn
+
+@node Timers, DMA Handling, Time and Date Handling, Kernel
+@section Timers
+@cindex Timers
+
+@dfn{Timers} are used to measure time intervals, they allow tasks to
+submit @dfn{timer requests} specifying the time interval that the timer
+should measure. When the interval of a timer expires an action
+associated with the timer is performed, this can either be to unblock a
+semaphore or call an arbitrary function. A @dfn{tick} is generated each
+time the timer interrupt handler is called, this happens 1024 times each
+second. Unless otherwise stated, all time values mentioned in this
+section are measured in terms of these 1024Hz frequency ticks.
+
+The header file @file{<vmm/time.h>} defines all structures and inline
+functions documented in this section.
+
+@tindex struct timer_req
+@example
+struct timer_req @{
+    /* The time at which this timer expires. */
+    u_long wakeup_ticks;
+
+    /* Points to the next timer in the ordered
+       list of active timers. */
+    struct timer_req *next;
+
+    /* The action to perform when the timer
+       expires. */
+    union @{
+        struct semaphore sem;
+        struct @{
+            void (*func)(void *user_data);
+            void *user_data;
+        @} func;
+    @} action;
+    char type;
+@};
+@end example
+
+@noindent
+This structure is used to represent timers; none of its fields should
+be modified by hand, the inline functions @code{set_timer_sem} and
+@code{set_timer_func} are the only supported methods of initialising a
+timer request structure. It is also important that the timer's
+interval is reinitialised @emph{every time} that it is used, even if
+it is the same each as before.
+
+@deftypefun {inline void} set_timer_sem (struct timer_req *@var{req}, u_long @var{ticks})
+Initialises the timer request structure @var{req} to measure an
+interval of @var{ticks} timer ticks. The timer request is set up so
+that its semaphore will be initially blocked, when the interval
+expires (after the timer has been started) the semaphore is unblocked.
+@end deftypefun
+
+@deftypefun {inline void} set_timer_func (struct timer_req *@var{req}, u_long @var{ticks}, void (*@var{func})(void *), void *@var{user_data})
+This inline function initialises the timer request structure @var{req}
+to measure an interval of @var{ticks} timer ticks. When the interval
+expires (after the timer has been started) the function @var{func}
+will be called with the parameter @var{user_data} as its sole argument.
+
+Note that @var{func} will be called from one of the timer interrupt
+handlers. This means that all the normal restrictions placed on
+interrupt handlers must be adhered to in the function @var{func}.
+@xref{Interrupt Handlers}.
+@end deftypefun
+
+@deftypefun {inline void} set_timer_interval (struct timer_req *@var{req}, u_long @var{ticks})
+This sets the number of timer ticks timed by the timer request
+@var{req} to be @var{ticks} for the next countdown. This doesn't
+initialise any other parts of the request structure, use
+@code{set_timer_sem} or @code{set_timer_func} for that. This function
+is normally used to reinitialise the interval for a timer that is used
+more than once.
+@end deftypefun
+
+Once a timer request has been initialised it may be added to the
+kernel's list of active timer requests to start timing the
+interval. When the interval expires whatever action the request has been
+set up to perform is executed (either unblocking a semaphore or calling
+a function).
+
+@deftypefn {kernel Function} void add_timer (struct timer_req *@var{req})
+Adds the timer request @var{req} to the list of requests for the
+system timer. This timer ticks 1024 times each second.
+@end deftypefn
+
+@deftypefn {kernel Function} void remove_timer (struct timer_req *@var{req})
+If the timer request @var{req} is in the list of active timer requests
+for the system timer remove it from this list. This means that the
+request will never be completed.
+@end deftypefn
+
+Sometimes a task simply wishes to suspend itself for a given time
+interval; two functions are provided to make this trivial.
+
+@deftypefn {kernel Function} void sleep_for_ticks (u_long @var{ticks})
+Suspends the current task for @var{ticks} 1024Hz ticks.
+@end deftypefn
+
+@deftypefn {kernel Function} void sleep_for (time_t @var{seconds})
+Suspends the current task for @var{seconds} number of seconds.
+@end deftypefn
+
+To measure @emph{very} small time intervals the kernel's microsecond
+timer may be used. This timer works by calibrating itself to the speed
+of the system's processor. When a time interval is to be measured it
+simply busy-waits for the required number of CPU cycles.
+
+@deftypefn {kernel Function} void udelay (u_long @var{micro_secs})
+This function busy-waits for the specified number of microseconds.
+Note that unless proper precautions are taken an interrupt occurring
+or the task being preempted may alter the time elapsed.
+@end deftypefn
+
+If a task wishes to measure an unknown time interval (for example to
+calculate the performance of a device driver) the kernel maintains a
+count of the number of timer ticks which have elapsed since the system
+was started. Reading this value at the beginning and end of an operation
+is enough to compute the time that the operation took.
+
+@deftypefn {kernel Function} u_long get_timer_ticks (void)
+Returns the number of times that the timer has ticked since the system
+was initialised. Each tick counts for 1/1024 seconds.
+@end deftypefn
+
+@node DMA Handling, Error Codes, Timers, Kernel
+@section DMA Handling
+@cindex DMA handling
+
+@include dma.texi
+
+@node Error Codes, Formatted Output, DMA Handling, Kernel
+@section Error Codes
+@cindex Error codes
+
+In each task structure there is an integer field called @code{errno},
+this is used by some parts of the system to record @emph{why} an
+operation failed. Currently, error codes are only used by the filing
+system and its device drivers. If a function does set @code{errno}
+when it fails it will note this in its documentation, generally
+@code{errno} is not altered when a function succeeds.
+
+@deftypefn {kernel Function} {const char *} error_string (int @var{errno})
+This function returns a string describing the error code @var{errno},
+or a null pointer if the error code is not known in the kernel.
+@end deftypefn
+
+The standard error codes are defined by the header file
+@file{<vmm/errno.h>}, the following table describes their meanings.
+
+@vtable @code
+@item E_OK
+No error occurred.
+
+@item E_NOEXIST
+The referenced object doesn't exist.
+
+@item E_NODEV
+The device doesn't exist.
+
+@item E_EXISTS
+The referenced object already exists.
+
+@item E_PERM
+The task doesn't have permission for this operation.
+
+@item E_NOTDIR
+The object is not a directory.
+
+@item E_ISDIR
+The object is a directory.
+
+@item E_NOSPC
+No more space on the storage medium.
+
+@item E_NOTEMPTY
+The object (usually a directory) is not empty.
+
+@item E_RO
+Writing to a read-only object.
+
+@item E_BADMAGIC
+An incorrect magic number has been detected.
+
+@item E_EOF
+The end of the file has been reached.
+
+@item E_DISKCHANGE
+The removable media was changed.
+
+@item E_IO
+Some kind of data error.
+
+@item E_NODISK
+The removable media was removed.
+
+@item E_BADARG
+An invalid parameter was passed to a function.
+
+@item E_XDEV
+Hard links can't span devices.
+
+@item E_NOMEM
+A memory allocation failed.
+
+@item E_INVALID
+An object (usually a device or inode) has been invalidated.
+
+@item E_INUSE
+The referenced object is still being used.
+
+@item E_NOTLINK
+The referenced object is not a symbolic link.
+
+@item E_MAXLINKS
+Too many symbolic links are being followed recursively.
+@end vtable
+
+@node Formatted Output, , Error Codes, Kernel
+@section Formatted Output
+@cindex Formatted output
+@cindex Printf
+
+The kernel provides a function to perform formatted output, compatible
+with the standard @code{printf} function found in every C library. Using
+this function it is possible to print messages to the system console
+from just about anywhere in the system.
+
+@deftypefn {kernel Function} void kvsprintf (char *@var{buf}, const char *@var{fmt}, va_list @var{args})
+This function produces a formatted string in the buffer @var{buf} from
+the format specification string @var{fmt} and the list of arguments
+@var{args}.
+
+The @var{fmt} string is copied to @var{buf}, each time a @samp{%}
+character is encountered it and some of the following characters are
+expanded into the buffer using the next of the values in @var{args}.
+To put a @samp{%} character in the buffer use two of these characters
+in @var{fmt} (i.e. @samp{%%}).
+
+The syntax of format specifiers in @var{fmt} is:
+
+@example
+%[@var{flags}][@var{width}][.@var{precision}][@var{type}]@var{conv}
+@end example
+
+@noindent
+Each set of brackets is an optional part of the specification. Each
+part is described in the following table:
+
+@table @var
+@item flags
+A list of one-character flags, each one altering the way in which the
+argument is formatted. Possible characters are:
+
+@table @asis
+@item @samp{-}
+Left justify the contents of the field.
+
+@item @samp{+}
+Put a plus character in front of positive signed integers.
+
+@item @samp{ }
+A space, put a space in from of positive signed integers (only if no 
+@samp{+} flag).
+
+@item @samp{#}
+Put @samp{0} before octal numbers and @samp{0x} or @samp{0X} before
+hex ones.
+
+@item @samp{0}
+Pad right-justified fields with zeros, not spaces.
+
+@item @samp{*}
+Use the next argument as the field width.
+@end table
+
+@item width
+A decimal integer defining the field width (for justification
+purposes). Right justification is the default, use the @samp{-} flag
+to change this.
+
+@item type
+An optional type conversion for integer arguments, it can be either 
+@samp{h} to specify a @code{short int} or @samp{l} to specify a
+@code{long int}.
+
+@item conv
+This character defines how to format the argument value, it can be one
+of:
+
+@table @samp
+@item i
+@itemx d
+A signed decimal integer.
+
+@item u
+@itemx Z
+An unsigned decimal integer.
+
+@item b
+An unsigned binary integer.
+
+@item o
+A signed octal integer.
+
+@item x
+@item X
+An unsigned hexadecimal integer, @samp{x} gets lower case hex digits,
+@samp{X} upper.
+
+@item p
+A pointer, printed in hexadecimal with a preceding @samp{0x} (i.e.
+like @samp{%#x}) unless the pointer is null when @samp{(nil)} is
+printed.
+
+@item c
+A character.
+
+@item s
+A string.
+@end table
+@end table
+@end deftypefn
+
+@deftypefn {kernel Function} void sprintf (char *@var{buf}, const char *@var{fmt}, ...)
+Uses the @code{vsprintf} function to format a string into the buffer
+pointed to by @var{buf}, using the format specification @var{fmt} and
+the other arguments to the function to produce the output string.
+@end deftypefn
+
+@deftypefn {kernel Function} void vprintf (const char *@var{fmt}, va_list @var{args})
+This function prints a string to the system console, using the function
+@code{vsprintf} and the parameters to this function to create the
+output string.
+
+If the @code{set_print_func} function has been used to install a
+kernel output handler it is called with the formatted string,
+otherwise the string is printed straight to the VGA video buffer.
+@end deftypefn
+
+@deftypefn {kernel Function} void printf (const char *@var{fmt}, ...)
+Use the @code{vprintf} function to print a formatted message.
+@end deftypefn
+
+@deftypefn {kernel Function} void set_print_func (void (*@var{func})(const char *, size_t))
+This function installs the function @var{func} to handle all kernel
+output messages (from @code{vprintf}). It is called with a string and
+the number of characters to print from it when a message should be
+printed to the console.
+@end deftypefn

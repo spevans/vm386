@@ -1,0 +1,10 @@
+
+This manual has been written with the user of the system in mind. It
+has little technical details, simply the information we think is
+necessary to use the system properly.
+
+Using the information contained in this manual you should be able to
+use the system to define and create virtual machines to execute in a
+standard PC.
+
+If technical details are required, consult the technical manual.

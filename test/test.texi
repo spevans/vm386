@@ -1,0 +1,230 @@
+\input texinfo  @c -*-Texinfo-*-
+@setfilename test.info 
+@settitle Testing Of The System 
+@footnotestyle end
+@iftex
+@afourpaper
+@end iftex
+
+@syncodeindex vr fn
+
+@titlepage
+@title Testing Of The System 
+@subtitle A virtual machine monitor for the Intel 80386
+@author S.P.S. Evans
+@author J.S. Harper
+@author C.J. Luke
+@end titlepage
+
+@ifinfo
+@node Top, Introduction, (dir), (dir)
+@top Testing Of The System 
+
+@menu 
+* Introduction::
+* Methodology::
+* Tests Conducted::
+@end menu
+@end ifinfo
+
+@node Introduction, Methodology, Top, Top
+@chapter Introduction
+
+This document is concerned with the testing of the project. It was necessary
+to test the system to ensure that it fulfilled its specification and that it
+had as few errors as possible. Due to the nature of the project, i.e. it
+being a stand alone operating system, some parts had to tested under different
+environments and also many parts could not be tested until the operating system
+itself was finished. This limited the amount of testing that could be conducted
+overall although with respect to the design specification of implementing
+virtual machines, testing was conducted to assess the extent and reliability
+of the virtual machines.
+
+Testing took place under three separate environments. 
+
+@itemize @bullet
+
+@item
+Unix was used for testing the shell and file system.
+
+@item
+MS-DOS and DJGPP (a free GNU DOS Extender) were used to test some of the 
+device drivers that were written before the construction of the kernel.
+
+@item
+MS-DOS was also used inside the virtual machines running under VMM/386 to
+test the compatibility of the emulation.
+@end itemize
+
+Testing was a continual process used throughout the development of the project,
+rather than being applied at the end to find bugs, because it was vital to
+ensure the correct operation of parts of the system which were vital to its
+operation (e.g. the core kernel).
+
+@node Methodology, Tests Conducted, Introduction, Top
+@chapter Methodology 
+
+The testing process was conducted in two parts.
+
+@section Testing External To The System.
+
+Because some parts of the project were written before the operating system
+was up and running, they were written so that they could be tested under 
+different environments. This required the use of the C preprocessor to
+conditionally include parts of the source files to interface them with the
+test environment. 
+
+The two test environments we used were Linux (a Unix like operating system)
+and DJGPP running under MS-DOS. These were used as testing environments 
+because they were stable systems and had appropriate tools to help with the
+testing process. The testing environments were utilised in such a way as
+to provide a good emulation of the final operating system's interface. This
+meant that the parts tested under these environments were considered solid
+enough to be used in the final system.
+
+This helped when we came to get the project up and running on its own since
+we could be sure that these parts were already reliable.
+
+@section Testing Internal To The System.
+
+As parts of the core kernel and support routines were written, they were tested
+insitu rather than being tested in external environments because of the nature
+of the routines. This meant that commands were added to the kernel to be used
+for testing the routines in place. Such parts as the scheduler and exception
+handlers could only be tested in this environment because the effort taken to
+write a simulation test bed for these would have been considerable and this
+could also have added other bugs into the system.
+
+
+@node Tests Conducted, , Methodology, Top
+@chapter Tests Conducted
+
+@section External Testing
+
+@subsection Testing The Shell
+
+This was tested under Linux. We conditionally compiled the code to interface
+the shell's I/O handlers to Linux's console. The GNU debugger (GDB) was used
+to find and correct the errors that occurred. Testing simply involved testing
+each of the shell commands to check that they worked as documented with input
+values designed to produce errors. After testing and debugging the shell was
+deemed to be a stable part of the system.
+
+@subsection Testing The Filing System
+
+This again was tested under Linux and used the previously tested shell as a
+user interface. A large file was used to simulate a device in the filing system
+and using this and the filing system shell commands, we were able to find and
+correct the many bugs that appeared during the testing. The filing system
+is a complicated piece of software which contained many bugs when first
+written. The final test bed which combined the shell and the filing system
+running under Linux was deemed sufficiently stable to be used as part of the
+installation process. It was used to copy modules from Linux where they were
+compiled, to our own filing system and also to retrieve system logs from 
+our filing system back to Linux.
+
+@subsection Keyboard Driver
+
+This was tested under DJGPP with a conditional compilation to include code
+to install the keyboard interrupt handler in the DJGPP dos extender. This
+enabled us to find the few bugs that existed in the keyboard driver. Overall,
+we found that the keyboard driver was very stable.
+
+@subsection Hard Disk and Floppy Disk Driver 
+
+These were tested using a similar method to that employed when testing the
+keyboard device driver. The hard disk driver was developed using this test
+system to find bugs as it was written. Overall, these two modules were found
+to be stable.
+
+@subsection The Initialisation Process
+
+This was tested using NuMega's Soft/ICE debugger. Because of the complexity
+of the boot sector and startup code, many bugs were found and corrected in this
+way. The initialisation process, after debugging, was found to be very stable.
+
+@subsection Testing On Different Machines
+
+One of the basic methods we employed was to test our operating system
+on as many different hardware configurations as possible. This revealed 
+only one major bug which was with enabling the A20 gate and was found on
+a PC which had a particularly old and slow chipset. This was soon diagnosed and
+appropriately fixed.
+
+@section Testing Internal To The System
+
+These tests were actually run under the operating system and served to test
+the extent and compatibility of the emulation subsystem. This was achieved
+by running an operating system (in this case MS-DOS) under a virtual machine
+and then running programs designed to test the virtual hardware.
+
+@subsection PC-Doctor
+This program is designed to test the hardware of a PC at the lowest level, i.e.
+by directly talking to the hardware. Running the system test enabled us to
+see what devices did not perform properly in the virtual environment. The
+devices it tested were:
+
+@itemize @bullet
+
+@item
+Virtual PIC - This failed on parts of the PIC that were not virtualised. The
+other parts passed successfully.
+
+@item
+Vitrual PIT - This failed on some aspects of testing channel 2. All other
+features of the PIT worked successfully.
+
+@item 
+Virtual CMOS - This failed on the Periodic and Alarm Interrupts. All other
+features of the CMOS including the real-time clock passed successfully.
+
+@item
+Virtual DMA - This failed on the tests because the virtual DMA was not designed
+to actually transfer data, only store the values written to the chips.
+
+@item
+Virtual Hard Disk - Although this does not actually test the register level
+controller, the BIOS level functions are tested thoroughly and these all
+passed.
+
+@item
+Virtual Keyboard - This passed all tests successfully.
+
+@item 
+Virtual Speaker - This passed all tests successfully.
+
+@item
+Virtual Video - The MDA emulation worked correctly but bugs were found in the
+graphics mode emulation of the CGA device.
+
+@item
+Virtual BIOS Data Area - This holds configuration information about the virtual
+machine and this information was correctly reported by PC-Doctor.
+@end itemize
+
+We also tested the virtual machine with a program called `CheckIt' which found
+many of the same problems.
+
+@subsection Other Software Tested
+
+@itemize @bullet
+@item
+Microsoft Windows 3.0 - This was run in Real-Mode and successfully worked.
+Because of the nature of this program it fully utilises the hardware of the
+machine and this shows the level of compatibility that we attained.
+
+@item
+Fractint - This tested the graphical capabilities of the CGA emulation and 
+showed very few bugs.
+
+@item
+WordPerfect 5.1 - This failed to work for an indeterminate reason. We believe
+it was to do with interaction between the virtual keyboard and the virtual
+BIOS.
+
+@item
+MS-DOS Dosshell - This almost worked apart from some graphical errors and an
+inability to select menus.
+@end itemize
+
+@bye

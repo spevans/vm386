@@ -1,0 +1,17 @@
+The @code{vprinter} virtual device creates virtual printer ports for a
+virtual machine. This allows printing from the virtual machine via the
+printer spooler.
+
+Use the @code{vmvxd} command to add a virtual printer device to the
+virtual machine being initialised (@pxref{Launching VMs}). The command
+format is:
+
+@example
+vmvxd vprinter @var{addr}@dots{}
+@end example
+
+Each @var{addr} parameter (there may be up to four in all) specifies
+the base address of one printer port in hexadecimal notation. This
+allows each virtual machine to have up to four printer ports. The
+standard printer port address are @code{278}, @code{378} and
+@code{3BC}.

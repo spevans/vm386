@@ -1,0 +1,187 @@
+
+We developed our system using the Linux operating system; a free Unix-
+like operating system for PCs. The main reason we chose Linux was that
+it already has many of the tools we needed to build our system. For
+example, a 32-bit C compiler (GCC), 16 and 32 bit assemblers, linkers
+and so on.
+
+@menu
+* System Tools::
+* Compiling The System::
+@end menu
+
+@node System Tools, Compiling The System, , Development Environment
+@section System Tools
+@cindex System tools
+@cindex Tools, system
+
+Although Linux contains many of the tools we needed (including gcc,
+gas, ld, as86 and ld86) we had to produce a number of small utility
+programs to be used in the process of building the system.
+Descriptions of these tools make up the following table.
+
+@table @code
+@findex mld
+@item mld [-v] [-v] [-o @var{dest-file}] @var{source-file}
+This program translates an a.out OMAGIC object file to the format
+required by the kernel's module loader (basically, a header, a single
+hunk containing the module's text and data, plus a table of relocations
+to perform).
+
+It also performs a number of consistency checks; for example the object
+file may not contain any unresolved external references. Common data
+symbols (global bss objects) are resolved as they are loaded from the
+a.out file.
+
+Each @code{-v} argument increases the verbosity of the program.
+
+@findex mstrip
+@item mstrip [-v] [-v] @var{object-file} @{-s @var{symbol-to-keep}@} [-o @var{dest-file}]
+This is used on a.out OMAGIC format module files to strip all symbols
+except @code{_kernel} and @code{_@var{foo}_module} (where @var{foo} is
+the name of the module). This is necessary since modules can be
+statically linked into the kernel. If two separate modules defined a
+symbol with a particular name there would be trouble.
+
+Each @code{-v} argument increases the verbosity of the program, the
+file called @var{object-file} is the a.out object to strip all symbols
+but those specified by the @code{-s} switches. If a @var{dest-file} is
+specified the stripped object is written to this file, otherwise the
+source is overwritten.
+
+@findex mdump
+@item mdump @var{module-file}
+Prints header information about the module stored in the file
+@var{module-file}.
+
+@findex bbin
+@item bbin @var{source-file} @var{dest-file}
+Strips the header from the file of 16 bit code in Minix format 
+(created by @code{ld86}) @var{source-file}, and copies the 512
+bytes of code in the file to @var{dest-file}. Only a code segment may be
+present in @var{source-file} and this code segment must be exactly 512 bytes
+in length. This is used to create images of boot blocks.
+
+@findex bbin16
+@item bbin16 @var{source-file} @var{dest-file}
+Similar to @code{bbin} except that a multiple of 512 bytes of code is
+copied from @var{source-file} to @var{dest-file}. Only a code segment may be
+present in @var{source-file}. This is used to create a binary image of the 
+16 bit startup code.
+
+@findex bsc
+@item bsc @var{bootsect-image} @var{bootsect-header}
+This program translates the binary bootsector image in the file
+@var{bootsect-image} to a C header file containing an array of
+480 characters called @code{bootsect_code}. A file of this type stored
+in the file @file{src/fs/bootsect.h} defines the standard system
+boot sector. Only 480 bytes of code are produced because the rest of the boot
+block is initialised by the @code{mkfs} portion of the file system.
+
+@findex btoa
+@item btoa @var{array-name} <@var{source-file} >@var{dest-file}
+A filter to translate a binary file @var{source-file} into a C array
+of characters called @var{array-name} in the file @var{dest-file}. As
+well as the array the output will also include an integer global
+variable called @code{@var{array-name}_length} containing the length
+of the array. This program is used to include files of 16 bit code
+into the 32 bit code emitted by the compiler.
+
+@findex e2b
+@item e2b @var{source-file} @var{dest-file}
+This program translates an a.out executable file (in either QMAGIC or
+ZMAGIC format) to a binary image file. No relocation information should be
+present in @var{source-file}.
+
+@findex makeimage
+@item makeimage @var{bootsect-image} @var{start16-image} @var{kernel-image} @var{device-name} >@var{image-file}
+Combines the three binary files @var{bootsect-image},
+@var{start16-image} and @var{kernel-image} into a single file
+@var{image-file} suitable for dd'ing to a diskette to create a
+bootable system disk.
+
+@var{device-name} is the name of the system's boot device, for example
+@samp{fd0:} or @samp{hda1}.
+
+@findex sbb
+@item sbb @var{boot-file}
+Prints out the information coded into the boot block stored in the file
+@var{boot-file}.
+
+@findex sysdisk
+@item sysdisk @var{start16-image} @var{kernel-image} @var{device-name} @var{system-file}
+Combines the two binary files of the system's startup (16 bit) and
+kernel (32 bit), and installs this system onto the device represented
+by the file @var{system-file}. The argument @var{device-name} names
+the device which is being booted from (for example @samp{hda4:}).
+@end table
+
+@node Compiling The System, , System Tools, Development Environment
+@section Compiling The System
+@cindex Compiling the system
+
+Since the system is fairly large we have split the source code into
+easily manageable sections, each section being stored in a separate
+directory. Each module is considered a section, the kernel is also
+split into sections. Each directory is given a @file{Makefile} whose
+default target is to build the contents of that directory (i.e. to
+create a module file or part of the kernel). The top-level
+@file{Makefile} can be used to recurse through the source hierarchy
+compiling each section in turn. This allows the whole system to be
+built by simply typing @samp{make} in the root of the source tree.
+
+The top-level @file{Makefile} also contains a number of phony targets,
+each of which performs some useful operation. These targets include
+the following:
+
+@table @samp
+@item image
+Create an image file called @file{image} suitable to be copied to a
+disk to create a bootable system disk.
+
+@item sys
+Copy the system to the filing system which has been set up to contain
+it. (See below.)
+
+@item disk
+Copy the @file{image} file to the floppy disk drive.
+
+@item root
+Create a root filing system for the system.
+
+@item getlog
+Copy the system log from the root filing system to the file @file{log}
+in the current directory of the Unix filing system.
+
+@item install
+Copy all modules to the @file{/lib} directory on the system's root
+filing system.
+
+@item realclean
+Totally clean the source tree.
+@end table
+
+To use these targets the following environment variables must be set
+to suitable values:
+
+@vtable @code
+@item VMM_ROOT
+The name of the device used to store the system's root filing system.
+For example @samp{hda1:}.
+
+@item VMM_ROOT_SIZE
+The size, in kilobytes, of the device named in the variable
+@code{VMM_ROOT}.
+
+@item VMM_BOOT
+The name of the device used to boot the system from. Often this will
+be the same as the value of the @code{VMM_ROOT} variable.
+
+@item VMM_CFLAGS
+Any special flags which should be passed to GCC as it compiles the
+system's source files.
+
+@item LD_DOES_QMAGIC
+Define this to something if your copy of the @code{ld} program can
+produce QMAGIC format executables.
+@end vtable

@@ -1,0 +1,215 @@
+
+A @dfn{virtual machine} is a special task, used to provide the
+illusion of a complete PC system to the program running in the task.
+
+All virtual machines are given a standard set of virtual hardware when
+they are created. This includes a tty to provide a virtual video
+adaptor and virtual keyboard hardware. Other virtual devices may be
+added using the shell commands that initialise virtual machines.
+
+@menu
+* Launching VMs::
+* Standard Virtual Devices::
+* Virtual IDE::
+* Virtual Floppy::
+* Virtual Printer::
+* Example VMs::
+@end menu
+
+@node Launching VMs, Standard Virtual Devices, , Virtual Machines
+@section Launching Virtual Machines
+@cindex Launching virtual machines
+@cindex Virtual machines, launching
+
+The shell is used to configure and launch a virtual machine; this
+involves initialising a virtual machine, specifying the hardware
+virtualised by this machine in a series of shell commands and a final
+command to actually start the newly created virtual machine executing.
+
+@deffn {Command} vminit [name] [memory-size] [display-type]
+This command begins a new virtual machine initialisation block for a
+virtual machine called @var{name}.
+
+The parameter @var{memory-size} defines the number of kilobytes of
+memory given to the new virtual machine while @var{display-type} names the
+type of virtual video adaptor given to the machine. Currently the only
+options are @samp{MDA} or @samp{CGA}.
+
+If any of the optional parameters aren't specified suitable default
+values are chosen.
+@end deffn
+
+@deffn {Command} vmvxd module-name [args @dots{}]
+This command is used to install a virtual device into the virtual
+machine currently being configured (i.e. the most recent @code{vminit}
+command).
+
+The parameter @var{module-name} names the virtual device module
+containing the virtualisation code, the optional argument strings
+@var{args} are passed to the virtual device's initialisation function.
+@end deffn
+
+@deffn {Command} vmlaunch
+Use this command to end a initialisation block started by the
+@code{vminit} command. The virtual machine is started executing.
+@end deffn
+
+Using the above shell commands blocks of commands completely
+configuring a virtual machine can be built. If these commands are
+saved in files they can be used as shell scripts to start a particular
+type of virtual machine.
+
+@node Standard Virtual Devices, Virtual IDE, Launching VMs, Virtual Machines
+@section Standard Virtual Devices
+@cindex Standard virtual devices
+@cindex Virtual devices, standard
+@cindex Virtual machines, standard devices
+
+When creating a virtual machine the virtual devices you give it is
+entirely up to you. However, several virtual devices exist that
+should normally be installed in a virtual machine to let it work as a
+real machine would. These devices are listed below
+
+@table @code
+@item vpic
+The virtual interrupt controller. Without this device the virtual
+machine won't receive any interrupt requests.
+
+@item vpit
+The virtual timer device.
+
+@item vcmos
+The virtual CMOS device.
+
+@item vdma
+The virtual DMA controller.
+
+@item vbios
+The virtual BIOS.
+@end table
+
+This basically means that every virtual machine initialisation block
+should include the following lines near its start.
+
+@example
+vmvxd vpic
+vmvxd vpit
+vmvxd vcmos
+vmvxd vdma
+vmvxd vbios
+@end example
+
+@node Virtual IDE, Virtual Floppy, Standard Virtual Devices, Virtual Machines
+@section Virtual IDE Device
+@cindex Virtual IDE device
+@cindex Virtual devices, IDE
+
+This virtual device (stored in the @code{vide} module) emulates a
+standard IDE hard disk controller with a single hard disk.
+
+When installing this virtual device in a virtual machine the module
+must be told how to virtualise the disk, this can either be done with
+a file in the system's filing system (@pxref{Filing System}) or by
+using all of a partition on a physical hard disk (note that using the
+partition representing the whole of a hard disk can allow a virtual
+machine to see the same hard disk as the physical machine does).
+
+The shell command to install a virtual IDE controller in a virtual
+machine has the format:
+
+@example
+vmvxd vide @var{disk} [@var{blocks}]
+@end example
+
+@noindent
+where @var{disk} specifies the object to use to virtualise the disk,
+either the name of a file, or a string ending in a colon (@samp{:})
+specifying a hard disk partition. The optional parameter @var{blocks}
+is only necessary when @var{disk} specifies a file; it defines the
+maximum number of blocks to give the virtual disk. When this
+parameters is omitted the device uses the size of the file or
+partition instead.
+
+From the maximum number of blocks, the device manufactures a plausible
+geometry for the virtual disk. If the @var{disk} is a physical hard
+disk (i.e. @file{hda:}) the geometry of the physical disk will be used
+instead (this guarantees compatibility with data already on the disk).
+
+Example commands to install the Virtual IDE device could be:
+
+@example
+# Create a file-based 20 meg. virtual disk.
+vmvxd vide /usr/hd-image 40960
+
+# Use the system's physical disk.
+vmvxd vide hda:
+
+# File-based, using the current size of the
+# file to provide the size of the disk.
+vmvxd vide /images/dos-hd.image
+@end example
+
+After installing a virtual IDE device the virtual machine will be able
+to use it in exactly the same way as a normal computer uses its hard
+disk.
+
+@node Virtual Floppy, Virtual Printer, Virtual IDE, Virtual Machines
+@section Virtual Floppy Device
+@cindex Virtual floppy device
+@cindex Virtual devices, floppy
+
+@include vfloppy.texi
+
+@node Virtual Printer, Example VMs, Virtual Floppy, Virtual Machines
+@section Virtual Printer Device
+@cindex Virtual printer device
+@cindex Virtual machines, printer
+
+@include vprinter.texi
+
+@node Example VMs, , Virtual Printer, Virtual Machines
+@section Example Virtual Machines
+@cindex Example virtual machines
+@cindex Virtual machines, examples
+
+This section contains several example blocks of commands to define and
+start virtual machines.
+
+@example
+# Start the initialisation block for a VM with
+# 2 megabytes of memory and a CGA display.
+vminit 2048 CGA
+
+  # Give it virtual PIC, PIT, DMA, CMOS and BIOS devices,
+  vmvxd vpic
+  vmvxd vpit
+  vmvxd vdma
+  vmvxd vcmos
+  vmvxd vbios
+
+  # a virtual IDE disk,
+  vmvxd vide /usr/dos-hd.image
+
+  # and a virtual printer.
+  vmvxd vprinter 0x278
+
+# Now launch the new machine.
+vmlaunch
+@end example
+
+The following example shows how you can get a virtual machine to boot
+from one of the host system's physical hard disks.
+
+@example
+vminit 1024 CGA
+  vmvxd vpic
+  vmvxd vpit
+  vmvxd vdma
+  vmvxd vcmos
+  vmvxd vbios
+
+  # Use device `hda' as the virtual disk; this is the first IDE
+  # hard disk.
+  vmvxd vide hda:
+vmlaunch
+@end example

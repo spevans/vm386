@@ -1,0 +1,78 @@
+# System-wide make definitions
+
+CC := gcc -I$(TOPDIR)
+CPP := /lib/cpp -I$(TOPDIR)
+LD := ld
+AS := as
+AR := ar
+STRIP := strip
+NM := nm
+AS86 := as86
+LD86 := ld86
+
+MLD := $(TOPDIR)/kernel/modules/mld
+MSTRIP := $(TOPDIR)/kernel/modules/mstrip
+
+CFLAGS := -O2 -Wall -Wstrict-prototypes $(VMM_CFLAGS)
+
+ifndef TEST
+CFLAGS += -fomit-frame-pointer
+endif
+
+%.o : %.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $@ $<
+
+%.s : %.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -S -o $@ $<
+
+%.o : %.s
+	$(AS) -o $@ $<
+
+%.o : %.S
+	$(CC) $(CPPFLAGS) -c -o $@ $<
+
+%.map : %.o
+	$(NM) $< | grep -v '_compiled' | sort >$@
+
+%.s16 : %.S16
+	$(CPP) $< -o $@
+
+%.o16 : %.s16
+	$(AS86) -0 -a $< -o $@
+
+# This rule builds dependancy files from C source files. The general idea
+# is that you include a `.d' file for each C file being compiled in a
+# subsystem's Makefile; GNU make realises that it has to build this .d file
+# and uses the following rule to do so. The resulting .d file contains a
+# list of dependancies of the .c file.
+#   So in a Makefile you might have:
+#
+#	SRCS = foo.c bar.c
+#	OBJS = $(SRCS:.c=.o)
+#
+#	include $(TOPDIR)/default.mk
+#
+#	baz.o : $(OBJS)
+#		$(LD) -r -o baz.o $(OBJS)
+#
+#	include $(SRCS:.c=.d)
+#
+%.d : %.c
+	$(SHELL) -ec '$(CC) -M $(CPPFLAGS) $< | sed '\''s/$*.o/& $@/g'\'' > $@'
+
+# Definitions for linking modules. Basically each module has something like
+# the following in its Makefile:
+#
+#	foo.module : $(OBJS)
+#
+# This ensures that the a.out file from ld is translated to a module file.
+# Note that each module must define a symbol whose value is the location of
+# the module's `struct module'. For a module `FOO', this symbol must be
+# `_FOO_module'.
+%.module :
+	$(CC) -c $(TOPDIR)/kernel/modules/crt0.S -o $*_crt0.o -DMODNAME=$*
+	$(CC) -c $(TOPDIR)/kernel/modules/crt1.S -o $*_crt1.o -DMODNAME=$*
+	$(LD) $(LDFLAGS) -r $*_crt0.o $^ $*_crt1.o -o $@.o
+	$(NM) $@.o | grep -v '_compiled' | sort >$@.map
+	$(MSTRIP) $(MSTRIPFLAGS) $@.o -s _kernel -s _$*_module
+	$(MLD) $(MLDFLAGS) -o $@ $@.o

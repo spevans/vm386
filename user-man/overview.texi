@@ -1,0 +1,43 @@
+
+This chapter provides a quick overview of the system. It is intended
+to introduce you to the concepts of the system; these concepts will
+then be expanded on in the remaining chapters of the manual.
+
+The system's main function is to allow multiple virtual machines to
+execute concurrently on a single PC style computer (386-based and
+above). A simple operating system has been designed and implemented to
+provide the basic support for multiple tasks. On top of this operating
+system we have implemented a number of software modules, each
+virtualising a hardware resource (providing a software replica of the
+device).
+
+Using a standard operating system task (i.e. a thread of control)
+@dfn{virtual machines} (a `copy' of a real machine, often shortened to
+just VM) can be created. This virtual machine has a set of virtual
+devices installed in it before being started. To a program (usually an
+operating system) running in a virtual machine, there is no difference
+between executing in a real machine or a virtual machine. The only
+noticeable difference should be the performance of the program in the
+virtual machine; since @emph{every} access to a piece of hardware is
+somehow emulated a substantial overhead is incurred.
+
+Although the objective of the system is to allow the creation of
+multiple virtual machines a number of other subsystems had to be
+created before this could be achieved
+
+@itemize @bullet
+@item
+The kernel of the operating system (all its basic functionality).
+@xref{Kernel}.
+
+@item
+Device drivers for all pieces of hardware we wish to support.
+
+@item
+A filing system to allow the storage and retrieval of data.
+@xref{Filing System}.
+
+@item
+A user interface, allowing the user to actually control the system.
+@xref{Shell}.
+@end itemize

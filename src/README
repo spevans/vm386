@@ -1,0 +1,48 @@
+
+This directory contains the complete source tree of VM/386 (or whatever its
+name is). Each directory is owned by the person writing/maintaining that
+part of the system, all directories are group-writable so that anyone can
+compile the whole system.
+
+The current hierarchy looks something like:
+
+
+debugger/			Debugger module
+drivers/			Device drivers
+drivers/physical/		Physical device drivers
+drivers/physical/floppy/ 	Floppy disk driver
+drivers/physical/hd/ 		Hard disk drivers	
+drivers/physical/kbd/		Keyboard driver
+drivers/physical/kbd/keymaps/	Keyboard Keymaps
+drivers/physical/ramdisk/	Ramdisk
+drivers/physical/tty/ 		Character-based virtual consoles
+drivers/virtual/		Virtual device emulation
+drivers/virtual/vbios/ 		Virtual BIOS
+drivers/virtual/vcmos/		Virtual CMOS
+drivers/virtual/vdma/		Virtual DMA
+drivers/virtual/vfloppy/	Virtual Floppy
+drivers/virtual/vide/		Virtual IDE controller
+drivers/virtual/video/ 		Video drivers
+drivers/virtual/vkbd/ 		Virtual keyboard
+drivers/virtual/vm/ 		Virtual machines
+drivers/virtual/vpic/		Virtual PIC
+drivers/virtual/vpit/		Virtual PIT
+drivers/virtual/vprinter/ 	Virtual printer port
+fs/				Native filing system
+fs/test/			File system test code
+kernel/				Kernel code
+kernel/init/			32 bit startup code
+kernel/misc/			General kernel stuff
+kernel/mm/			Memory management
+kernel/modules/			Dynamic module loading
+kernel/tasks/			Task handling
+kernel/traps/			Exception handling
+kernel/alloc/			Memory allocation (GNU)
+shell/				User interface
+start16/			16 bit startup and loader
+test/				General test module
+tools/				Tools for building binaries etc
+vmm/				System-wide include files
+syslogd/			System message logger
+output/				Binaries output directory
+spooler/			Print spooler

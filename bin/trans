@@ -1,0 +1,16 @@
+#!/bin/sh
+
+for f in `find . -type d -print`
+do
+  if [ ! -d ../src.pr/$f ]; then
+    echo Making ../src.pr/$f
+    mkdir ../src.pr/$f
+  fi
+done
+
+for f in `find . -type f -print`
+do
+  echo $f
+  sed -e 's//^L/g' <$f >../src.pr/$f
+  /usr/5bin/touch -m `getdate $f` ../src.pr/$f
+done

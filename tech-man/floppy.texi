@@ -1,0 +1,141 @@
+The floppy disk device driver provides the
+filing system (@pxref{Filing System}) with an interface to talk to
+the floppy disk drives of the machine. The module is divided into three
+sections:
+
+@enumerate
+@item
+Filing System interface. This deals with
+requests from the filing system, and the operating system generally,
+and performing the desired functions.
+
+@item
+Function and Queue handling. This area acts as a go-between between
+the Filing system and the lowest level of the floppy driver. The
+functions performed by this module are those that are not low level,
+but aren't part of the interface to the rest of the system.
+
+@item
+Low level FDC (Floppy Disk Controller) handling. This is concerned with
+the lowest level I/O required to control the floppy drive and it's
+associated hardware.
+@end enumerate
+
+The floppy disk driver is found in the @samp{fd} module (@pxref{Modules})
+and all the functions documented in this section of the manual are
+located in this module (relevant header files are @file{<vmm/floppy.h>}
+and @file{<vmm/fd_regs.h>} as well as @file{fd.h} in the
+floppy driver module directory).
+
+@menu
+* Floppy Filing System interface::
+* Floppy Function and Queue handling::
+* FDC Low level routines::
+@end menu
+
+@node Floppy Filing System interface, Floppy Function and Queue handling, , Floppy Disk 
+@subsection Floppy Filing System Interface
+@cindex Floppy filing system interface
+@cindex Floppy disk, filing system
+
+The only real function of this module of code, located in the file
+@file{fd-fs.c}, is to define the functions
+which are exported primarily to the Filing system. It converts requests
+in terms of blocks to those of sectors and queues them for execution.
+
+The Floppy hardware on PC's defines a sector size of 512 bytes, and
+the Floppy device treats each sector as a block. The Filing system,
+however, does not have to use the same size for a block, and presently
+uses 1024 byte blocks. This mapping is performed quite simply before
+the request is queued.
+
+@deftypefn {fd Function} long floppy_read_block (void *@var{fd}, blkno @var{block}, void *@var{buf}, int @var{count})
+This function, called from the Filing system, merely converts the
+@var{block} and @var{count} values, which are in terms of
+the block size used by the Filing system, into sector based
+values and issues a call to the @code{floppy_read_blocks}
+function (see below). @var{fd} is a pointer to the desired
+Floppy drive, and @var{buf} is where the information is to
+be read into.
+@end deftypefn
+
+@deftypefn {fd Function} long floppy_write_block (void *@var{fd}, blkno @var{block}, void *@var{buf}, int @var{count})
+This function is exactly the same as @code{floppy_read_block}, above,
+with the exception is issues a call to the @code{floppy_write_blocks}
+function, described below. Similarly, the @var{buf} variable points
+to the information to be written out.
+@end deftypefn
+
+@deftypefn {fd Function} long floppy_read_blocks (fd_dev_t *@var{fd}, void *@var{buf}, u_long @var{block}, int @var{count})
+This function take the information passed and builds a request buffer
+based on it, queuing this read operation for execution using the mechanism
+defined in @file{<vmm/blkdev.h>} (@pxref{Block Devices}).
+@end deftypefn
+
+@deftypefn {fd Function} long floppy_write_blocks (fd_dev_t *@var{fd}, void *@var{buf}, u_long @var{block}, int @var{count})
+As with @code{floppy_read_blocks}, this function queues the 
+specified write request with the Floppy driver.
+@end deftypefn
+
+Other requests the the Filing system can generate are in terms of
+device management, rather than utilisation. These are more oriented
+towards fixed-devices, rather than removable, such as mount and make
+partition. Floppy disks are generally too small to warrant
+partitioning. These functions thus just return @code{FALSE} to
+indicated that they are not supported.
+
+During the initialisation stage of the driver, the Filing system
+is informed of the Floppy devices available, and this is handled
+in this section.
+
+Finally, the module contains the timer interrupt routine used to
+disable the Floppy drive motors after a period of inactivity.
+
+@node Floppy Function and Queue handling, FDC Low level routines, Floppy Filing System interface, Floppy Disk
+@subsection Floppy Function And Queue handling
+@cindex Floppy function and queue handling
+@cindex Floppy disk, function and queue handling
+
+This code, found in @file{floppy.c}, 
+contains the central queue handling code, which itself
+contains the code to drive the lower level elements of the driver,
+and the module initialisation code.
+
+During initialisation, the driver queries the CMOS RAM to find out
+the number of drives present and their types, resetting the FDC
+and causing a recalibrate of each drive in the process. It also
+starts the timer required to disable drive motors after a period
+of inactivity and allocates space for DMA transfers.
+
+There are presently three requests that can be performed, Read, Write
+and Seek. Read and write are self explanatory, and seek moves the
+head of the specified drive to a specific cylinder. These each perform
+the set of functions calls, found in the lower level FDC module described
+next.
+
+@node FDC Low level routines, ,  Floppy Function and Queue handling, Floppy Disk
+@subsection FDC Low Level Routines
+@cindex FDC low level routines
+@cindex Floppy disk, FDC routines
+
+The operation of the Floppy subsystem falls into two areas as a
+result of it's implementation in the PC architecture. The PC uses
+a the 8272A Floppy Disc Controller (FDC) produced by Intel, although
+most modern implementations use the slightly enhanced NEC PD765B
+version.
+
+As part of the mechanism to control drive motors and the
+drive select, possibly across more than one FDC, the PC introduces
+what is known as the Digital Output and Digital Input Registers (DOR
+and DIR, respectively). On older XT based machines, only the DOR
+is present. The DIR's function is to set the data rate for
+High-density floppy devices.
+
+The @file{fdc.c} module defines a set of functions for setting up
+the DOR and DIR, accounting for motors that should be running.
+
+Each function of the FDC then calls, if relevant, the DOR function
+to select the relevant drive and then performs the function. Most,
+but not all, of the FDC functions generate an interrupt during their
+execution.
+
