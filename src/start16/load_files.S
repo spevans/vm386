@@ -5,9 +5,12 @@ LOAD_SEG	= 0x8000	! where it is loaded
 
 !SECS_PER_TRACK	= 9
 !HEADS		= 2
+SECTORS_PER_LBA_READ = 96       ! Cant read everything in one go as the
+                                ! destination address seems to wrap at 64K
 
 .extern PrintString
 .extern done
+.extern HexDump
 
 .globl LoadFiles
 LoadFiles:
@@ -32,24 +35,67 @@ LoadFiles:
 	int	#0x13			! reset the floppy
 
 not_floppy:
-	mov	esi,kernel_start
-	mov	edi,kernel_count
-	mov	ax,#LOAD_SEG
-	mov	es,ax
-next_load:
-	xor	bx,bx			! es:bx -> load buffer
-	push	edi
-	call	load_track
-	and	eax,#0xFFFF
-	push	eax
-	call	do_block_copy
-	call	do_load_mesg
-	pop	eax
-	pop	edi
-	sub	edi,eax
-	jz	all_loaded
-	add	esi,eax
-	jmp	next_load
+        ! Load using extended bios LBA load
+        mov     si,#lba_load
+        call    PrintString
+
+        mov     ax,kernel_start
+        mov     dap_lba_lo,ax
+        mov     ax,kernel_start+2
+        mov     dap_lba_lo+2,ax
+
+load_loop:
+        mov     ax,kernel_count
+        cmp     ax,#SECTORS_PER_LBA_READ
+        jle     load_count
+        mov     ax,#SECTORS_PER_LBA_READ
+
+load_count:
+        sub     kernel_count, ax        ! update sectors left to read
+        mov     dap_sector_count,ax
+        mov     si,#dap
+        push    es
+        mov     ax,ds
+        mov     es,ax
+        mov     cl,#16
+        call    HexDump
+        pop     es
+
+        mov     si,#dap
+        mov     ah,#0x42        ! Extended read sectors
+        mov     dl,boot_dev
+
+        int     #0x13
+        jc      disk_error
+        cmp     word kernel_count, #0
+        je      all_loaded
+        add     word dap_load_segment, #0xC00   ! add 48K by adding to segment
+        add     dword dap_lba_lo, #SECTORS_PER_LBA_READ
+        jmp     load_loop
+
+!load_error:
+!       mov     si,#kernel_load_failed
+!       call    PrintString
+!       hlt
+
+!	mov	esi,kernel_start
+!	mov	edi,kernel_count
+!	mov	ax,#LOAD_SEG
+!	mov	es,ax
+!next_load:
+!	xor	bx,bx			! es:bx -> load buffer
+!	push	edi
+!	call	load_track
+!	and	eax,#0xFFFF
+!	push	eax
+!	call	do_block_copy
+!	call	do_load_mesg
+!	pop	eax
+!	pop	edi
+!	sub	edi,eax
+!	jz	all_loaded
+!	add	esi,eax
+!	jmp	next_load
 
 all_loaded:
 	mov	si,#done
@@ -188,9 +234,30 @@ track_mesg:	.word	load1, load2, load3, load4
 next_mesg:	.word	0
 
 
+!kernel_load_failed:
+!        .asciz  "failed"
+
+lba_load:
+        .asciz  "using LBA..."
 loading_kernel:
 	.ascii	"Loading Kernel..."
 	.byte	0
+
+
+! DAP (Disk Address Packet) Used to load kernel via LBA
+dap:
+        .byte  16       ! DAP size
+        .byte   0       ! always zero
+dap_sector_count:
+        .word   0      ! sectors to read
+dap_load_offset:
+        .word   0
+dap_load_segment:
+        .word   DEST_SEG
+dap_lba_lo:             ! 64bit absolute sector to load
+        .long   0        ! 41017354
+dap_lba_hi:
+        .long   0
 
 
 ! grabbed from the bootsector

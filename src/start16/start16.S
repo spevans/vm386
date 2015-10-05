@@ -192,9 +192,9 @@ kernel_map:
 	add	eax,#0x1000
 	dec	ecx
 	je	end_kernel_map
-	cmp	eax,esi		; if eax >= esi then we've filled
-	jb	kernel_map	; in all the valid entries we need.
-
+	! cmp	eax,esi		; if eax >= esi then we've filled
+	! jb	kernel_map	; in all the valid entries we need.
+        jmp     kernel_map
 				; ecx = count to end of table
 				; es:edi -> next entry
 	xor	eax,eax
@@ -225,6 +225,7 @@ end_kernel_map:
 	mov	si,#done
 	call	PrintString
 	mov	si,#idting
+	call    PrintString
 	seg	es
         lidt    fword ptr (14)
         pop     es
@@ -345,8 +346,6 @@ intoff:		.ascii	'Turning off interrupts...'
 		db	0x00
 patchjmp:	.ascii	'Patching in 32bit jmp address...'
 		db	0x00
-move32:		.ascii	'Moving 32bit code to physical address 0000h...'
-		db	0x00
 done:		.ascii	' done'
 		db	0x0a, 0x0d, 0x00
 goingin:	.ascii	'Entering Protected Mode'
@@ -355,7 +354,7 @@ bodge:		.ascii	'Debodging system...'
 		db	0x00
 proot:		.ascii	'Patching in root device...'
 		db	0x00
-root_dev:	.ascii	ROOT_DEV
+root_dev:	.ascii	"rd0:"
 		db	0x00	
 
 .text

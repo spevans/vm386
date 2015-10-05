@@ -20,10 +20,14 @@ str1:           .ascii	"TTY Driver Initialised"
 .globl PrintString
 .globl Cls
 .globl InitTTY
+.globl HexDump
+.globl printLong
 
 ! dl = x dh = y
 SetCursorPos:
 
+        push    bx
+        push    cx
         cmp     dl,#MAX_COLS
         jg      scperror
         cmp     dh,#MAX_ROWS
@@ -53,6 +57,8 @@ SetCursorPos:
         out     dx,al
 
 scperror:
+        pop     cx
+        pop     bx
         ret
 
 
@@ -62,26 +68,29 @@ ScrollUp:
         push    es
         push    di
         push    si
-
+        push    cx
         les     di,ScrBase
         lds     si,ScrBase
-        add     si,#MAX_COLS * 2
-        mov     cx,#SCR_WIDTH * SCR_HEIGHT-1 * 2
+        add     si,#160         ! SCR_WIDTH*2
+        mov     cx,#1920        ! SCR_WIDTH * (SCR_HEIGHT-1)
         cld
         rep    
-	movsb
+        movsw
         mov     cx,#SCR_WIDTH
         mov     ax,#0x0720
         rep
-	stosw
+        stosw
 
+        pop     cx
         pop     si
         pop     di
         pop     es
         pop     ds
+        push    dx
         mov     dl,Col
         mov     dh,Row
         call    SetCursorPos
+        pop     dx
         ret
 
 
@@ -106,15 +115,12 @@ SetCursorType:
 
 ! ds:si -> string
 PrintString:
-        push    es
-        push    di
 	push	ax
 	push	bx
 	push	cx
 	push	dx
 
 nextchr:
-        les     di,ScrBase
         mov     al,(si)
         or      al,al
         jz      strend
@@ -154,8 +160,28 @@ notnl:
         add     Col,ah
         call    testxy
 	jmp	nextchr
-
 nottab:
+        call    print_char
+        jmp     nextchr
+
+        strend:
+        mov     dl,Col
+        mov     dh,Row
+        call    SetCursorPos
+	pop	dx
+	pop	cx
+	pop	bx
+	pop	ax
+        ret
+
+        ! prints character in AL to screen at current position
+        ! clobbers ah
+print_char:
+        push    bx
+        push    cx
+        push    es
+        push    di
+        les     di,ScrBase
         mov     ch,#7
         mov     cl,al
         mov     al,Row
@@ -170,20 +196,11 @@ nottab:
         mov     (di),cx
         inc     byte Col
 	call	testxy
-	jmp	nextchr
-
-strend:
-        mov     dl,Col
-        mov     dh,Row
-        call    SetCursorPos
-	pop	dx
-	pop	cx
-	pop	bx
-	pop	ax
         pop     di
         pop     es
-        ret
-
+        pop     cx
+        pop     bx
+	ret
 
 testxy:
         mov     al,Col
@@ -213,6 +230,11 @@ Cls:
         cld
         rep
 	stosw
+        mov     byte Row,#0
+        mov     byte Col,#0
+        xor     dx,dx
+        call    SetCursorPos
+
         pop     es
         pop     di
         ret
@@ -227,4 +249,90 @@ InitTTY:
         call    SetCursorPos
 	mov	si,#str1
 	call	PrintString
+        ret
+
+! Dump CL bytes from ES:SI
+HexDump:
+        push    bx
+        cmp     cl,#0
+        je      HexDumpEnd
+
+next_line:
+        mov     byte Col,#0     ! reset to a newline
+        inc     byte Row
+        call    testxy
+        mov     ch,#0           ! number of bytes output perline
+        mov     bx,es
+        call    printWord       ! print seg:offset
+        mov     al,#58          ! ':'
+        call    print_char
+        mov     bx,si
+        call    printWord
+        mov     al,#32
+        call    print_char
+
+next_byte:
+        seg     es
+        mov     bl,(si)
+        call    printByte
+        dec     cl
+        cmp     cl,#0
+        je      HexDumpEnd
+        inc     si
+        inc     ch
+        cmp     ch,#16
+        je      next_line
+        mov     al,#32          ; space
+        call    print_char
+        jmp     next_byte
+
+HexDumpEnd:
+        mov     byte Col,#0     ! reset to a newline
+        inc     byte Row
+        call    testxy
+        push    dx
+        mov     dl,Col
+        mov     dh,Row
+        call    SetCursorPos
+        pop     dx
+        pop     bx
+        ret
+
+! print the hex digit in low 4 bits of AL to the screen
+PrintNibble:
+        and     al,#0xf
+        add     al,#48
+        cmp     al,#58          ! is AL  A-F?
+        jl      less_than_a
+        add     al,#7
+less_than_a:
+        call    print_char
+        ret
+
+! print the byte in BL to the screen
+printByte:
+        mov     al,bl
+        shr     al,#4
+        call    PrintNibble
+        mov     al,bl
+        call    PrintNibble
+        ret
+
+! print the word in BX to the screen
+printWord:
+        mov     al,bh
+        shr     al,#4
+        call    PrintNibble
+        mov     al,bh
+        call    PrintNibble
+        call    printByte
+        ret
+
+! print the long in EBX to the screen
+printLong:
+        mov     edx,ebx
+        shr     ebx,#16
+        call    printWord
+        mov     bx,dx
+        call    printWord
         ret

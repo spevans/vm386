@@ -27,13 +27,33 @@ got_sys_dsk:
 	cmp	dx,#0x80
 	jge	got_hd
 	call	figure_floppy
-	jmp	load_start16
-got_hd:	
-	call	figure_hard
+	jmp	floppy_load_start16
 
+got_hd:
+	! Load using extended bios LBA load
+	! call	figure_hard
+	mov     si,#lba_start_msg
+	call    show_str
 
+	mov     ax,start16_count
+	mov     dap_sector_count,ax
 
-load_start16:
+	mov     ax,start16_start
+	mov     dap_lba_lo,ax
+	mov     ax,start16_start+2
+	mov     dap_lba_lo+2,ax
+
+	mov     ah,#0x42        ! Extended read sectors
+	mov     dl,boot_dev
+	mov     si,#dap
+	int     #0x13
+	jnc     all_read
+	mov     si,#lba_failed_msg
+        call    show_str
+        jmp     reboot
+
+floppy_load_start16:
+        ! Non LBA load, currently unu
 	mov	ax,#LOAD_SEG
 	mov	es,ax			! es:bx = buffer
 	xor	bx,bx
@@ -48,7 +68,7 @@ load_start16:
 	mov	cx,start16_cylsec
 
 next_track:
-	mov	al,sectors	 	! number of sec to read
+	mov	al,sectors              ! number of sec to read
 	mov	ah,#0
 	push	cx
 	and	cl,#0x3f
@@ -88,14 +108,16 @@ read_ok:
 	cmp	dh,heads
 	jle	next_track
 	xor	dh,dh			! head 0
-	add	ch,#1			! next track 	
+	add	ch,#1			! next track
 	adc	cl,#0x40		! set top bits of track
 	jmp	next_track
 
 all_read:
+	mov     si,#lba_ok_msg
+	call    show_str
 	jmpi	0, #LOAD_SEG
 
-disk_error:	
+disk_error:
 	mov	si,#dsk_err_msg
 	call	show_str
 
@@ -115,7 +137,7 @@ next_chr:
 	or	al,al
 	jz	show_str_end
 	int	#0x10
-	jmp	next_chr	
+	jmp	next_chr
 show_str_end:
 	ret
 
@@ -135,7 +157,7 @@ get_sectors:
 	mov	bx,#0x8000		! buffer to load into
 	int	#0x13
 	jnc	got_sector_count	! it all worked
-	cmp	ah,#4			
+	cmp	ah,#4
 	jne	disk_error
 	inc	si
 	jmp	get_sectors
@@ -159,7 +181,10 @@ figure_hard:
 	shr	dh,cl
 	mov	cylinders,dx
 	ret
-	
+
+lba_start_msg:	.asciz  "LBA load starting..."
+lba_ok_msg:	.asciz "ok"
+lba_failed_msg:	.asciz "LBA Load failed"
 not_sys_dsk:	.ascii	"Not a system disk"
 	.byte	0x0
 dsk_err_msg:	.ascii	"Disk Error"
@@ -170,22 +195,37 @@ reboot_msg:	.ascii	" - Press any key to reboot"
 sector_list:		! list of possible sec/track to try
 	.byte	36,18,15,9
 
+! DAP (Disk Address Packet) Used to load start16 via LBA
+dap:
+	.byte  16       ! DAP size
+	.byte   0       ! always zero
+dap_sector_count:
+	.word   0       ! sectors to read
+dap_load_offset:
+	.word   0
+dap_load_segment:
+	.word   LOAD_SEG
+dap_lba_lo:             ! 64bit absolute sector to load
+	.long   0
+dap_lba_hi:
+	.long   0
+
 ! following values filled in by makeimage program
-.org	453	
+.org	453
 start16_cylsec:		! start cylinder and sector in bios packed format
-	.word	0	
-start16_head:		! start head 
-	.byte	0	
+	.word	0
+start16_head:		! start head
+	.byte	0
 start16_start:		! 0 based LBA start sector of start16
 	.long	0
 start16_count:		! number of sectors occupied by start16
-	.long	0	
+	.long	0
 
 kernel_cylsec:		! start cylinder and sector in bios packed format
 	.word	0
 kernel_head:		! start head
 	.byte	0
-kernel_start:		! 0 based LBA start sector of kernel 
+kernel_start:		! 0 based LBA start sector of kernel
 	.long	0
 kernel_sectors:		! number of sectors occupied by kernel
 	.long	0

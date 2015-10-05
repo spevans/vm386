@@ -103,7 +103,11 @@ inreal:
         clc
         ret
 
+        ! hardcode to 16M as CMOS read doesnt seem to work
 GetMemory:
+        mov     dx,#16384
+        mov     total_mem,dx
+        ret
 	mov	al,#0x17
 	out	#0x70,al
 	in	al,#0x71
