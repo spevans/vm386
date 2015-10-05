@@ -63,7 +63,7 @@ struct boot_blk {
 struct inode {
     u_long attr;
     size_t size;
-    time_t modtime;
+    time32_t modtime;
     u_long nlinks;
     /* Pointers to data blocks. data[9->11] are single, double and
        triple indirect blocks. */

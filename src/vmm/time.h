@@ -27,7 +27,6 @@ extern __inline__ void __delay(int loops)
 }
 
 #ifdef KERNEL
-extern volatile time_t date;
 extern volatile u_long timer_ticks;
 #endif
 
@@ -80,18 +79,16 @@ set_timer_interval(struct timer_req *req, u_long ticks)
 
 /* Prototypes. */
 
-#ifdef KERNEL
 
 extern void update_cmos_date(void);
 extern void add_timer(struct timer_req *req);
 extern void remove_timer(struct timer_req *req);
 extern void sleep_for_ticks(u_long ticks);
-extern void sleep_for(time_t length);
+extern void sleep_for(time32_t length);
 extern u_long get_timer_ticks(void);
 extern void udelay(u_long usecs);
-extern void expand_time(time_t cal, struct time_bits *tm);
-extern time_t current_time(void);
+extern void expand_time(time32_t cal, struct time_bits *tm);
+extern time32_t current_time(void);
 extern void init_time(void);
 
-#endif /* KERNEL */
 #endif /* _VMM_TIME_H */

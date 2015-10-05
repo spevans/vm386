@@ -25,7 +25,7 @@
 
 volatile u_long timer_ticks;
 volatile u_long mums;
-static volatile time_t date;
+static volatile time32_t date;
 volatile unsigned long delay_loop_counter;
 
 
@@ -95,7 +95,7 @@ sleep_for_ticks(u_long ticks)
 
 /* Sleep for LENGTH seconds. */
 void
-sleep_for(time_t length)
+sleep_for(time32_t length)
 {
     sleep_for_ticks(length * 1024);
 }
@@ -114,7 +114,7 @@ sleep_for(time_t length)
  *
  * This algorithm was first published by Gauss (I think).
  */
-static inline time_t
+static inline time32_t
 mktime(unsigned int year, unsigned int mon,
        unsigned int day, unsigned int hour,
        unsigned int min, unsigned int sec)
@@ -123,7 +123,7 @@ mktime(unsigned int year, unsigned int mon,
 		mon += 12;	/* Puts Feb last since it has leap day */
 		year -= 1;
 	}
-	return ((((time_t)(year/4 - year/100 + year/400 + 367*mon/12 + day) +
+	return ((((time32_t)(year/4 - year/100 + year/400 + 367*mon/12 + day) +
 		  year*365 - 719499
 		  )*24 + hour /* now have hours */
 		 )*60 + min /* now have minutes */
@@ -206,7 +206,7 @@ get_timer_ticks(void)
 }
 
 #if 0
-static time_t
+static time32_t
 get_cmos_date(void)
 {
 	unsigned int year, mon, day, hour, min, sec;
@@ -253,11 +253,11 @@ get_cmos_date(void)
 
 /* Time utility functions. */
 
-time_t
+time32_t
 current_time(void)
 {
 #ifdef TEST
-    return time(NULL);
+    return (time32_t)time(NULL);
 #else
     while(cmos_time_update);
     return date;
@@ -310,7 +310,7 @@ leap_year(int yr)
 }
 
 void
-expand_time(time_t cal, struct time_bits *tm)
+expand_time(time32_t cal, struct time_bits *tm)
 {
     int month, year, nxt;
     DB(("expand_time: cal=%Z tm=%p\n", cal, tm));
@@ -401,7 +401,7 @@ init_time(void)
 int
 main(int argc, char **argv)
 {
-    time_t date = current_time();
+    time32_t date = current_time();
     struct time_bits tm;
     expand_time(date, &tm);
     printf("%d => %02d/%02d/%4d %02d:%02d:%02d\n",

@@ -4,6 +4,8 @@
 #ifndef _VMM_TYPES_H
 #define _VMM_TYPES_H
 
+#include <stdint.h>
+
 /* This file assumes 32-bit ints and longs. */
 
 #ifndef __NO_TYPE_CLASHES
@@ -11,8 +13,9 @@ typedef unsigned int u_int;
 typedef unsigned long u_long;
 typedef unsigned short u_short;
 typedef unsigned char u_char;
-typedef unsigned long time_t;
 #endif
+
+typedef uint32_t time32_t;
 
 typedef int int32;
 typedef unsigned int u_int32;

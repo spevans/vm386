@@ -189,7 +189,7 @@ Display the current date."
 int
 cmd_date(struct shell *sh, int argc, char **argv)
 {
-    time_t time = current_time();
+    time32_t time = current_time();
     struct time_bits tm;
     expand_time(time, &tm);
     sh->shell->printf(sh, "%3s %-2d %3s %2d:%02d:%02d %4d\n",
@@ -358,7 +358,7 @@ Put the shell to sleep for SECONDS seconds."
 int
 cmd_sleep(struct shell *sh, int argc, char **argv)
 {
-    time_t secs;
+    time32_t secs;
     if(argc < 1)
 	return 0;
     secs = strtoul(argv[0], NULL, 0);

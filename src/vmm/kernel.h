@@ -99,9 +99,9 @@ struct kernel_module
     void (*add_timer)(struct timer_req *req);
     void (*remove_timer)(struct timer_req *req);
     void (*sleep_for_ticks)(u_long ticks);
-    void (*sleep_for)(time_t length);
-    void (*expand_time)(time_t cal, struct time_bits *tm);
-    time_t (*current_time)(void);
+    void (*sleep_for)(time32_t length);
+    void (*expand_time)(time32_t cal, struct time_bits *tm);
+    time32_t (*current_time)(void);
     u_long (*get_timer_ticks)(void);
     void (*udelay)(u_long usecs);
 
