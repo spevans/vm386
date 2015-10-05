@@ -17,12 +17,12 @@ Options available are:\n\n\
 int
 cmd_syslog(struct shell *sh, int argc, char **argv)
 {
-    char *fname = NULL;
+    // char *fname = NULL;
     bool stop = FALSE, start = FALSE, status = FALSE, level = FALSE;
 
     while(argc--) {
         if(**argv != '-') {
-            fname = *argv;
+            // fname = *argv;
             break;
         } else {
             if(!strcmp(*argv, "-start"))
