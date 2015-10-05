@@ -10,10 +10,11 @@ NM := nm
 AS86 := as86
 LD86 := ld86
 
-MLD := $(TOPDIR)/kernel/modules/mld
-MSTRIP := $(TOPDIR)/kernel/modules/mstrip
+MLD := $(TOPDIR)/kernel/modules/mld-elf
+MSTRIP := $(STRIP)
+MSTRIPFLAGS := --remove-section=.comment --remove-section=.eh_frame -g
 
-CFLAGS := -O2 -Wall -Wstrict-prototypes $(VMM_CFLAGS)
+CFLAGS := -O2 -Wall -Wstrict-prototypes $(VMM_CFLAGS) -fno-strict-aliasing -fno-builtin -m32 -march=i386 -Werror -Wall -Wextra -Wno-attributes -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers
 
 ifndef TEST
 CFLAGS += -fomit-frame-pointer
@@ -22,10 +23,10 @@ endif
 %.o : %.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $@ $<
 
-%.s : %.c
+%.asm : %.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -S -o $@ $<
 
-%.o : %.s
+%.o : %.asm
 	$(AS) -o $@ $<
 
 %.o : %.S
@@ -34,10 +35,10 @@ endif
 %.map : %.o
 	$(NM) $< | grep -v '_compiled' | sort >$@
 
-%.s16 : %.S16
+%.asm16 : %.S16
 	$(CPP) $< -o $@
 
-%.o16 : %.s16
+%.o16 : %.asm16
 	$(AS86) -0 -a $< -o $@
 
 # This rule builds dependancy files from C source files. The general idea
@@ -72,7 +73,6 @@ endif
 %.module :
 	$(CC) -c $(TOPDIR)/kernel/modules/crt0.S -o $*_crt0.o -DMODNAME=$*
 	$(CC) -c $(TOPDIR)/kernel/modules/crt1.S -o $*_crt1.o -DMODNAME=$*
-	$(LD) $(LDFLAGS) -r $*_crt0.o $^ $*_crt1.o -o $@.o
+	$(LD) $(LDFLAGS) -r $*_crt0.o $^ -o $@.o
 	$(NM) $@.o | grep -v '_compiled' | sort >$@.map
-	$(MSTRIP) $(MSTRIPFLAGS) $@.o -s _kernel -s _$*_module
-	$(MLD) $(MLDFLAGS) -o $@ $@.o
+	cp $@.o $@

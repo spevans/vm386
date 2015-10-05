@@ -1,0 +1,28 @@
+ENTRY(main)
+OUTPUT_FORMAT(binary)
+INPUT(init/startup.o   init/init.o  alloc/alloc.o  misc/misc.o  mm/mm.o  traps/traps.o  tasks/tasks.o  modules/modules.o )
+
+
+SECTIONS
+{
+  .text.start (0x4000) : {
+    _text_start = .;
+    init/startup.o( .text )
+    *(.text)
+    *(.rodata)
+    _text_end = .;
+  }
+
+  .data : ALIGN(0x1000) {
+    _data_start = .;
+    *(.data)
+    _data_end = .;
+  }
+
+  .bss : {
+    _bss_start = .;
+    *(.bss) *(COMMON)
+    _bss_end = .;
+    _kernel_end = .;
+  }
+}

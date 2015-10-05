@@ -70,13 +70,18 @@ imginst:
 
 clean :
 	find . '(' -name '*~'						\
-		   -o -name '*.[oads]'					\
+		   -o -name '*.[oad]'					\
+		   -o -name '*.asm'					\
 		   -o -name '*.module'					\
 		   -o -name '*.map'					\
 		   -o -name '*.bin'					\
 		   -o -name '*.out'					\
 		   -o -name 'err'					\
 		   -o -name core ')' -print | xargs rm -f
+	make -C tools clean
+	make -C drivers clean
+	make -C kernel clean
+	make -C fs clean
 
 rclean :
 	set -e; for dir in $(SUBDIRS); do $(MAKE) -C $$dir clean; done
