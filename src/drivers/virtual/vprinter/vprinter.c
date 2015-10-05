@@ -72,7 +72,7 @@ static bool
 create_vprinter(struct vm *vmach, int argc, char **argv)
 {
     struct vprinter *new = kernel->calloc(sizeof(struct vprinter), 1);
-    u_short bda_ports[4];
+    //u_short bda_ports[4];
     if(argc == 0) return FALSE; 
     if(new != NULL)
     {
@@ -83,11 +83,11 @@ create_vprinter(struct vm *vmach, int argc, char **argv)
 	new->kh.func = delete_vprinter;
 	vm->add_vm_kill_handler(vmach, &new->kh);
 	vmach->slots[vm_slot] = new;
-	for(i = 0; i < 4; i++) bda_ports[i] = 0;
+	//for(i = 0; i < 4; i++) bda_ports[i] = 0;
 
 	for(i = 0; i < 4; i++) {
 		base = kernel->strtoul(*argv, NULL, 16);
-		bda_ports[i] = base;
+		//bda_ports[i] = base;
 #ifdef DEBUG
 		kprintf("base address at 0x%X\n", base);
 #endif
@@ -138,6 +138,10 @@ new_spool_file(struct vm *vm, u_short port)
   return 1;
 }
 
+static void
+printer_initialise(struct vm *vm, struct vm86_regs *regs)
+{
+}
 
 u_short
 write_char(struct vm *vm, u_short port, u_short data)

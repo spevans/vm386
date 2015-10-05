@@ -14,10 +14,9 @@
 
 #define kprintf kernel->printf
 
-struct kernel_module *kernel;
 struct video_module *video;
-struct kbd_module *kbd;
-struct vkbd_module *vkbd;
+static struct kbd_module *kbd;
+static struct vkbd_module *vkbd;
 
 static list_t tty_list;
 
@@ -92,11 +91,11 @@ tty_clear_chars(struct tty *tty, size_t length)
    position in TTY. NL, TAB and BEL characters are treated specially. The
    cursor is advanced over the displayed text. */
 static void
-tty_printn(struct tty *tty, const u_char *text, size_t length)
+tty_printn(struct tty *tty, const char *text, size_t length)
 {
     char *buf = video->find_page(&tty->video, tty->current_page);
-    u_char *cursor_char;
-    u_char c;
+    char *cursor_char;
+    char c;
 
 #define UPDATE_CURS \
     cursor_char = (buf + (tty->y * TTY_COLS(tty) * 2) + (tty->x * 2))
@@ -140,23 +139,23 @@ tty_printn(struct tty *tty, const u_char *text, size_t length)
 
 /* Use tty_printn() to print the zero-terminated string BUF in TTY. */
 static inline void
-tty_print(struct tty *tty, const u_char *buf)
+tty_print(struct tty *tty, const char *buf)
 {
     tty_printn(tty, buf, strlen(buf));
 }
 
 /* Do a vprintf() into the tty TTY. */
 static void
-tty_vprintf(struct tty *tty, const u_char *fmt, va_list args)
+tty_vprintf(struct tty *tty, const char *fmt, va_list args)
 {
-    u_char buf[1024];
+    char buf[1024];
     kernel->vsprintf(buf, fmt, args);
     tty_print(tty, buf);
 }
 
 /* Do a printf() into the tty TTY. */
 static void
-tty_printf(struct tty *tty, const u_char *fmt, ...)
+tty_printf(struct tty *tty, const char *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);

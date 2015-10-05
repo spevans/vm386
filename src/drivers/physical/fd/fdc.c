@@ -377,7 +377,7 @@ void read_intr(void)
 	 * I don't think handle_error does a good enough job
 	 * on reporting these things imho tho :)
 	 */
-	if(from_fdc[0] & ST0_INTR != 0)
+	if((from_fdc[0] & ST0_INTR) != 0)
 	{
 		handle_error("read_intr");
 		do_request(NULL);
@@ -491,7 +491,7 @@ fdc_seek(fd_dev_t *dev, u_long cyl)
 
 	i |= (send_command(FD_SEEK) != E_OK);
 	i |= (send_param(FD_DRV2(dev->drvno)) != E_OK);
-	i != (send_param(cyl) != E_OK);
+	i |= (send_param(cyl) != E_OK);
 
 #ifdef I_SEEK
 	while(j-- && int_seek_flag == FALSE)
@@ -540,7 +540,7 @@ fdc_read_id(fd_dev_t *dev)
 
 	i |= (send_command(FD_READ_ID) != E_OK);
 
-	i != (send_param(FD_DRV2(dev->drvno)) != E_OK);
+	i |= (send_param(FD_DRV2(dev->drvno)) != E_OK);
 
 #ifdef I_READ_ID
 	while(j-- && int_read_id_flag == FALSE)
@@ -583,15 +583,15 @@ bool fdc_specify(fd_dev_t *dev)
 
 	select_drive(dev);
 
-	i != (send_command(FD_SPECIFY) != E_OK);
+	i |= (send_command(FD_SPECIFY) != E_OK);
 
 #if 0
-	i != (send_param((dev->drive_p->step_rate)<<4 |
+	i |= (send_param((dev->drive_p->step_rate)<<4 |
 		(dev->drive_p->head_unload)) != E_OK);
 	i |= (send_param((dev->drive_p->head_load)<<1) != E_OK);
 #else
 	i |= (send_param(0x8f) != E_OK);
-	i != (send_param(0x10) != E_OK);
+	i |= (send_param(0x10) != E_OK);
 #endif
 
 #ifdef I_SPECIFY

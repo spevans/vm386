@@ -22,7 +22,7 @@ struct vm_module *vm;
 static int vm_slot;
 
 
-void
+static void
 delete_vdma(struct vm *vm)
 {
     struct vdma *v = vm->slots[vm_slot];
@@ -387,17 +387,19 @@ vdma_out(struct vm *vm, u_short port, int size, u_long val)
 }
 
 
-void
+static void
 get_dma_info(struct vm *vm, u_int channel, struct channel_info *info)
 {
+    DB(("get_dma_info: vm = %p channel = %u info = %p\n", vm, channel, info));
 }
 
-void
+static void
 set_dma_info(struct vm *vm, u_int channel, struct channel_info *info)
 {
+    DB(("set_dma_info: vm = %p channel = %u info = %p\n", vm, channel, info));
 }
 
-
+
 /* Module stuff. */
 
 static struct io_handler dma_io[3] = {
@@ -446,5 +448,5 @@ struct vdma_module vdma_module =
       create_vdma },
     delete_vdma,
     get_dma_info,
-    get_dma_info
+    set_dma_info
 };

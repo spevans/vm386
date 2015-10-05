@@ -12,7 +12,7 @@
 
 
 #define DOC_vdisk "vdisk PID FLOPPY-IMAGE\n\
-Change the file used to provide the floppy image for the virtual machine
+Change the file used to provide the floppy image for the virtual machine\n\
 whose pid is PID."
 int
 cmd_vdisk(struct shell *sh, int argc, char **argv)

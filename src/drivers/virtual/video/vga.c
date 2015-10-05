@@ -5,6 +5,7 @@
 #include <vmm/types.h>
 #include <vmm/video.h>
 #include <vmm/vga.h>
+#include <vmm/string.h>
 
 
 /* VGA register sets for the various BIOS modes. */
@@ -20,7 +21,7 @@ static const u_char mode0_regs[60] = {
   0x67
 };
 static const struct mode_info mode0_info = {
-    40, 25, (char *)0xb8000, 2048, 8, TRUE, FALSE
+  40, 25, (u_char *)0xb8000, 2048, 8, TRUE, FALSE
 };
 
 /* BIOS mode 0x01 */
@@ -34,7 +35,7 @@ static const u_char mode1_regs[60] = {
   0x67
 };
 static const struct mode_info mode1_info = {
-    40, 25, (char *)0xb8000, 2048, 8, TRUE, TRUE
+    40, 25, (u_char *)0xb8000, 2048, 8, TRUE, TRUE
 };
 
 /* BIOS mode 0x02 */
@@ -48,7 +49,7 @@ static const u_char mode2_regs[60] = {
   0x67
 };
 static const struct mode_info mode2_info = {
-    80, 25, (char *)0xb8000, 2048, 4, TRUE, FALSE
+    80, 25, (u_char *)0xb8000, 2048, 4, TRUE, FALSE
 };
 
 /* BIOS mode 0x03 */
@@ -62,7 +63,7 @@ static const u_char mode3_regs[60] = {
   0x67
 };
 static const struct mode_info mode3_info = {
-    80, 25, (char *)0xb8000, 4096, 4, TRUE, TRUE
+    80, 25, (u_char *)0xb8000, 4096, 4, TRUE, TRUE
 };
 
 /* BIOS mode 0x04 */
@@ -76,7 +77,7 @@ static const u_char mode4_regs[60] = {
   0x63
 };
 static const struct mode_info mode4_info = {
-    320, 200, (char *)0xb8000, 8192, 4, FALSE, TRUE
+    320, 200, (u_char *)0xb8000, 8192, 4, FALSE, TRUE
 };
 
 /* BIOS mode 0x05 */
@@ -90,7 +91,7 @@ static const u_char mode5_regs[60] = {
   0x63
 };
 static const struct mode_info mode5_info = {
-    320, 200, (char *)0xb8000, 8192, 4, FALSE, FALSE
+    320, 200, (u_char *)0xb8000, 8192, 4, FALSE, FALSE
 };
 
 /* BIOS mode 0x06 */
@@ -104,7 +105,7 @@ static const u_char mode6_regs[60] = {
   0x63
 };
 static const struct mode_info mode6_info = {
-    640, 200, (char *)0xb8000, 16384, 1, FALSE, FALSE
+    640, 200, (u_char *)0xb8000, 16384, 1, FALSE, FALSE
 };
 
 /* BIOS mode 0x07 */
@@ -118,7 +119,7 @@ static const u_char mode7_regs[60] = {
   0x66
 };
 static const struct mode_info mode7_info = {
-    80, 25, (char *)0xb0000, 4096, 1, TRUE, FALSE
+    80, 25, (u_char *)0xb0000, 4096, 1, TRUE, FALSE
 };
 
 /* BIOS mode 0x0D */
@@ -132,7 +133,7 @@ static const u_char mode13_regs[60] = {
   0x63
 };
 static const struct mode_info mode13_info = {
-    320, 200, (char *)0xa0000, 8192, 8, FALSE, TRUE
+    320, 200, (u_char *)0xa0000, 8192, 8, FALSE, TRUE
 };
 
 /* BIOS mode 0x0E */
@@ -146,7 +147,7 @@ static const u_char mode14_regs[60] = {
   0x63
 };
 static const struct mode_info mode14_info = {
-    640, 200, (char *)0xa0000, 16384, 4, FALSE, TRUE
+    640, 200, (u_char *)0xa0000, 16384, 4, FALSE, TRUE
 };
 
 /* BIOS mode 0x0F */
@@ -160,7 +161,7 @@ static const u_char mode15_regs[60] = {
   0xA2
 };
 static const struct mode_info mode15_info = {
-    640, 350, (char *)0xa0000, 28672, 2, FALSE, FALSE
+    640, 350, (u_char *)0xa0000, 28672, 2, FALSE, FALSE
 };
 
 /* BIOS mode 0x10 */
@@ -174,7 +175,7 @@ static const u_char mode16_regs[60] = {
   0xA3
 };
 static const struct mode_info mode16_info = {
-    640, 350, (char *)0xa0000, 28672, 2, FALSE, TRUE
+    640, 350, (u_char *)0xa0000, 28672, 2, FALSE, TRUE
 };
 
 /* BIOS mode 0x11 */
@@ -188,7 +189,7 @@ static const u_char mode17_regs[60] = {
   0xE3
 };
 static const struct mode_info mode17_info = {
-    640, 480, (char *)0xa0000, 38912, 1, FALSE, TRUE
+    640, 480, (u_char *)0xa0000, 38912, 1, FALSE, TRUE
 };
 
 /* BIOS mode 0x12 */
@@ -202,7 +203,7 @@ static const u_char mode18_regs[60] = {
   0xE3
 };
 static const struct mode_info mode18_info = {
-    640, 480, (char *)0xa0000, 38912, 1, FALSE, TRUE
+    640, 480, (u_char *)0xa0000, 38912, 1, FALSE, TRUE
 };
 
 /* BIOS mode 0x13 */
@@ -216,7 +217,7 @@ static const u_char mode19_regs[60] = {
   0x63
 };
 static const struct mode_info mode19_info = {
-    640, 480, (char *)0xa0000, 38912, 1, FALSE, TRUE
+    640, 480, (u_char *)0xa0000, 38912, 1, FALSE, TRUE
 };
 
 #define LAST_MODE 19

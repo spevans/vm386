@@ -170,7 +170,7 @@ top:
     head = track % dev->disk_p->heads;
     cyl = track / dev->disk_p->heads;
 
-    DB(("fd:do_request: cyl=%d sect=%d head=%d\n", cyl, sect, head));
+    DB(("fd:do_request: cyl=%d sect=%d head=%d sects=%d\n", cyl, sect, head, sects));
 
     switch(req->command)
     {

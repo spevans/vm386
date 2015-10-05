@@ -12,7 +12,8 @@
 struct rl_info {
     struct tty *tty;
 
-    long cursor_pos, cursor_x, cursor_y;
+    long cursor_pos;
+    u_long cursor_x, cursor_y;
     long mark_pos;
     long prompt_end_x, prompt_end_y;
 
@@ -84,7 +85,7 @@ rl_set_cursor(struct rl_info *rl)
 static void
 rl_redisplay_from(struct rl_info *rl, u_long start)
 {
-    long x, y;
+    u_long x, y;
     if(start >= rl->line_len)
 	return;
     rl_find_pos(rl, start, &x, &y);
@@ -105,6 +106,9 @@ rl_redisplay(struct rl_info *rl)
     rl_set_cursor(rl);
 }
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
+#if 0
 /* Redraw the section of the line RL starting at START for EXTENT
    characters. */
 static void
@@ -121,7 +125,11 @@ rl_redisplay_extent(struct rl_info *rl, u_long start, long extent)
     rl->tty->x = x; rl->tty->y = y;
     tty_module.printn(rl->tty, rl->line_buf + start, extent);
     rl_set_cursor(rl);
-}   
+}
+#endif
+#pragma GCC diagnostic pop
+
+
 
 /* Fix the buffer of RL so it can hold at least MIN-LEN characters. */
 static bool
@@ -160,7 +168,7 @@ rl_insert(struct rl_info *rl, char *str, size_t len)
 static bool
 rl_delete(struct rl_info *rl, u_long start_pos, long extent)
 {
-    long x, y;
+    u_long x, y;
     if(start_pos > rl->line_len)
     {
 	extent -= (rl->line_len - start_pos);
@@ -422,6 +430,7 @@ static inline bool
 rl_set_mark(struct rl_info *rl)
 {
     rl->mark_pos = rl->cursor_pos;
+    return TRUE;
 }
 
 static inline bool
@@ -540,31 +549,31 @@ readline(struct tty *tty, size_t *lengthp)
 	{
 	    switch(c)
 	    {
-	    case '':
+	    case '\x1B': //'':
 		rl.had_esc = TRUE;
 		break;
 
-	    case '':
+	    case '\x18': //'':
 		rl.had_ctrl_x = TRUE;
 		break;
 
-	    case '':
+	    case '\x06': //'':
 		cursor_moved = rl_forward_char(&rl, PREFIX_ARG(&rl));
 		break;
 
-	    case '':
+	    case '\x02': //'':
 		cursor_moved = rl_forward_char(&rl, -PREFIX_ARG(&rl));
 		break;
 
-	    case '':
+	    case '\x01': //'':
 		cursor_moved = rl_beginning_of_line(&rl);
 		break;
 
-	    case '':
+	    case '\x05': //'':
 		cursor_moved = rl_end_of_line(&rl);
 		break;
 
-	    case '':
+	    case '\x04': //'':
 		if(rl.cursor_pos == rl.line_len)
 		{
 		    if(rl.cursor_pos == 0)
@@ -575,11 +584,11 @@ readline(struct tty *tty, size_t *lengthp)
 		    rl_delete(&rl, rl.cursor_pos, PREFIX_ARG(&rl));
 		break;
 
-	    case '':
+	    case '\x7F': //'':
 		cursor_moved = rl_backward_delete_char(&rl);
 		break;
 
-	    case '':
+	    case '\r': //'^M':
 	    case '\n':
 		rl_enter_history(&rl);
 		rl.cursor_pos = rl.line_len;
@@ -589,7 +598,7 @@ readline(struct tty *tty, size_t *lengthp)
 		rl.line_buf[rl.line_len++] = '\n';
 		goto finished;
 
-	    case '':
+	    case '\x0C': //'':
 		rl_redisplay(&rl);
 		break;
 
@@ -597,11 +606,11 @@ readline(struct tty *tty, size_t *lengthp)
 		cursor_moved = rl_set_mark(&rl);
 		break;
 
-	    case '':
+	    case '\x0E': //'':
 		cursor_moved = rl_next_history(&rl, PREFIX_ARG(&rl));
 		break;
 
-	    case '':
+	    case '\x10': //'':
 		cursor_moved = rl_next_history(&rl, -PREFIX_ARG(&rl));
 		break;
 
@@ -614,11 +623,11 @@ readline(struct tty *tty, size_t *lengthp)
 	    rl.had_ctrl_x = FALSE;
 	    switch(c)
 	    {
-	    case '':
+	    case '\x1B': //^[':
 		rl.had_esc = TRUE;
 		break;
 
-	    case '':
+	    case '\x18': //'^X':
 		cursor_moved = rl_exchange_point_and_mark(&rl);
 		break;
 

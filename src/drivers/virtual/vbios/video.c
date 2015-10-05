@@ -18,7 +18,7 @@ extern struct tty_module *tty;
 static inline void
 bios_scroll_up_one(struct tty *vmtty, short page)
 {
-    char *buf = (TTY_BUF(vmtty) + (page * TTY_PAGE_SIZE(vmtty)));
+    u_char *buf = (TTY_BUF(vmtty) + (page * TTY_PAGE_SIZE(vmtty)));
     memcpy_user(buf, buf + TTY_COLS(vmtty) * 2, TTY_COLS(vmtty) * 2
 		* (TTY_ROWS(vmtty)-1));
     memsetw_user(buf + TTY_COLS(vmtty) * 2 * (TTY_ROWS(vmtty)-1), 0x0720,
@@ -123,7 +123,7 @@ bios_scroll_up(struct tty *vmtty, u_int num_lines, u_char attr, u_int left_col,
     }
     else
     {
-        char *src, *dest;
+        u_char *src, *dest;
         int count, width;
  
         count = right_col - left_col + 1;
@@ -172,7 +172,7 @@ bios_scroll_down(struct tty *vmtty, u_int num_lines, u_char attr,
     }
     else
     {
-        char *src, *dest;
+        u_char *src, *dest;
         int count, width;
  
         count = right_col - left_col + 1;
@@ -200,7 +200,7 @@ bios_scroll_down(struct tty *vmtty, u_int num_lines, u_char attr,
     }
 }
 
-static inline char *
+static inline void *
 bios_find_page(struct tty *vmtty, u_char pageno)
 {
     return (TTY_BUF(vmtty) + TTY_PAGE_SIZE(vmtty) * pageno);
@@ -318,7 +318,7 @@ vbios_video_handler(struct vm *vm, struct vm86_regs *regs)
 	{
 	    u_char page = GET8H(regs->ebx);
 	    u_short cursor = get_user_short(&BIOS_DATA->cursor_pos[page]);
-	    char *buf = bios_find_page(vm->tty, page)
+	    u_char *buf = bios_find_page(vm->tty, page)
 		+ (((cursor >> 8) * TTY_COLS(vm->tty) + (cursor & 255)) * 2);
 	    int count = GET16(regs->ecx);
 	    u_char c = GET8(regs->eax);

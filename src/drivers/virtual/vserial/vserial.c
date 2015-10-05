@@ -111,7 +111,7 @@ create_vserial(struct vm *vmach, int argc, char **argv)
 
 
 
-u_short
+static u_short
 new_spool_file(struct vm *vm, u_short port)
 {
 #ifdef DEBUG
@@ -121,7 +121,7 @@ new_spool_file(struct vm *vm, u_short port)
 }
 
 
-u_short
+static u_short
 write_char(struct vm *vm, u_short port, u_short data)
 {
 #ifdef DEBUG
@@ -131,7 +131,7 @@ write_char(struct vm *vm, u_short port, u_short data)
 }
 
 
-u_short
+static u_short
 get_status(struct vm *vm, u_short port)
 {
 #ifdef DEBUG

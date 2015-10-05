@@ -82,9 +82,9 @@ push_di(struct vm86_regs *regs, u_long prefixes, int size, u_long val)
     else
     {
 	if(regs->eflags & FLAGS_DF)
-	    (u_short)regs->edi -= size;
+	    regs->edi -= size;
 	else
-	    (u_short)regs->edi += size;
+	    regs->edi += size;
     }
 }
 
@@ -118,9 +118,9 @@ pop_si(struct vm86_regs *regs, u_long prefixes, int size)
     else
     {
 	if(regs->eflags & FLAGS_DF)
-	    (u_short)regs->esi -= size;
+            regs->esi -= size;
 	else
-	    (u_short)regs->esi += size;
+	    regs->esi += size;
     }
     return res;
 }

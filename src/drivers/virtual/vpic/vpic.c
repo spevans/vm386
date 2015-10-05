@@ -296,6 +296,7 @@ vpic_out(struct vm *vm, u_short port, int size, u_long val)
 		    pic->state = Normal;
 		    break;
 		default:
+                        break;
 		}
 	    }
 	    break;

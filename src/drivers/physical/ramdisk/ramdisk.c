@@ -135,7 +135,7 @@ create_ramdisk(u_long blocks)
 	rd_dev_t *new = kernel->malloc(sizeof(rd_dev_t));
 	if(new == NULL)
 		return NULL;
-	new->ram = kernel->malloc(blocks * 512);
+	new->ram = kernel->malloc(blocks * FS_BLKSIZ);
 	if(new->ram == NULL) 
 		return NULL;
 	new->drvno = nextdrv;

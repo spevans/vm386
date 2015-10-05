@@ -5,6 +5,7 @@
 #include <vmm/kbd.h>
 #include <vmm/keycodes.h>
 #include <vmm/tasks.h>
+#include <vmm/string.h>
 
 #ifdef TEST_KBD
 # ifndef GO32

@@ -467,7 +467,7 @@ set_stat(struct vide *v, bool ok, bool write, u_char err)
     v->error = ok ? 0 : err;
 }
 
-int
+static int
 read_user_blocks(struct vm *vm, u_int drvno, u_int head, u_int cyl,
 		 u_int sector, int count, void *buf)
 {
@@ -501,7 +501,7 @@ read_user_blocks(struct vm *vm, u_int drvno, u_int head, u_int cyl,
     return actual;
 }
 
-int
+static int
 write_user_blocks(struct vm *vm, u_int drvno, u_int head, u_int cyl,
 		  u_int sector, int count, void *buf)
 {
@@ -536,7 +536,7 @@ write_user_blocks(struct vm *vm, u_int drvno, u_int head, u_int cyl,
     return actual;
 }
 
-bool
+static bool
 get_status(struct vm *vm, u_char *statp, u_char *errp)
 {
     struct vide *v = vm->slots[vm_slot];
@@ -547,7 +547,7 @@ get_status(struct vm *vm, u_char *statp, u_char *errp)
     return TRUE;
 }
 
-bool
+static bool
 get_geom(struct vm *vm, u_int *headsp, u_int *cylsp, u_int *sectsp)
 {
     struct vide *v = vm->slots[vm_slot];
