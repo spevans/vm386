@@ -116,73 +116,73 @@ static inline void
 insb(void *buf, int count, u_short port)
 {
     asm volatile ("cld\n\t"
-		  "rep ; insb"
-		  : /* no outputs */
-		  : "d" (port), "D" (buf), "c" (count)
-		  : "edi", "ecx", "memory");
+                  "rep ; insb"
+                  : "+D" (buf), "+c" (count)
+                  : "d" (port)
+                  : "memory");
 }
 
 static inline void
 outsb(void *buf, int count, u_short port)
 {
     asm volatile ("cld\n\t"
-		  "rep ; outsb"
-		  : /* no outputs */
-		  : "d" (port), "S" (buf), "c" (count)
-		  : "esi", "ecx", "memory");
+                  "rep ; outsb"
+                  : "+S" (buf), "+c" (count)
+                  : "d" (port)
+                  : "memory" );
 }
 
 static inline void
 insw(void *buf, int count, u_short port)
 {
     asm volatile ("cld\n\t"
-		  "rep ; insw"
-		  : /* no outputs */
-		  : "d" (port), "D" (buf), "c" (count)
-		  : "edi", "ecx", "memory");
+                  "rep ; insw"
+                  : "+D" (buf), "+c" (count)
+                  : "d" (port)
+                  : "memory");
 }
 
 static inline void
 outsw(void *buf, int count, u_short port)
 {
     asm volatile ("cld\n\t"
-		  "rep ; outsw"
-		  : /* no outputs */
-		  : "d" (port), "S" (buf), "c" (count)
-		  : "esi", "ecx", "memory");
+                  "rep ; outsw"
+                  : "+S" (buf), "+c" (count)
+                  : "d" (port)
+                  : "memory");
 }
 
 static inline void
 insl(void *buf, int count, u_short port)
 {
     asm volatile ("cld\n\t"
-		  "rep ; insl"
-		  : /* no outputs */
-		  : "d" (port), "D" (buf), "c" (count)
-		  : "edi", "ecx", "memory");
+                  "rep ; insl"
+                  : "+D" (buf), "+c" (count)
+                  : "d" (port)
+                  : "memory");
 }
 
 static inline void
 outsl(void *buf, int count, u_short port)
 {
     asm volatile ("cld\n\t"
-		  "rep ; outsl"
-		  : /* no outputs */
-		  : "d" (port), "S" (buf), "c" (count)
-		  : "esi", "ecx", "memory");
+                  "rep ; outsl"
+                  : "+S" (buf), "+c" (count)
+                  : "d" (port)
+                  : "memory");
 }
 
 
 /* The following probably don't belong here, but it'll do for now... */
 
-#define cli() asm volatile ("cli" : : : "memory")
-#define sti() asm volatile ("sti" : : : "memory")
-#define hlt() asm volatile ("hlt" : : : "memory")
-#define nop() asm volatile ("nop")
+#define cli() do { asm volatile ("cli" : : : "memory"); } while(0)
+#define sti() do { asm volatile ("sti" : : : "memory"); } while(0)
+#define hlt() do { asm volatile ("hlt" : : : "memory"); } while(0)
+#define nop() do { asm volatile ("nop"); } while(0)
 
 #define save_flags(x) \
-    asm volatile ("pushfl ; popl %0" : "=r" (x) : : "memory")
+    do { asm volatile ("pushfl ; popl %0" : "=r" (x) : : "memory"); } while(0)
 #define load_flags(x) \
-    asm volatile ("pushl %0 ; popfl" : : "r" (x) : "memory")
+    do { asm volatile ("pushl %0 ; popfl" : : "r" (x) : "memory"); } while(0)
 
 #endif /* _VMM_IO_H */

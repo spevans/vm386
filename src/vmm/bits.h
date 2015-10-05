@@ -24,7 +24,7 @@ test_bit(void *bit_string, int bit_offset)
     return ((char *)bit_string)[bit_offset / 8] & (1 << (bit_offset % 8));
 }
 
-#define BSF(word, result) asm ("bsfl %1,%0" : "=r" (result) : "r" (word))
+#define BSF(word, result) asm volatile ("bsfl %1,%0" : "=r" (result) : "r" (word))
 
 /* Scan the bit-string BITS for the first zero bit and return its position.
    LEN is the number of bits to scan, note that it actually searches to the
@@ -48,7 +48,7 @@ find_zero_bit(void *bits, int len)
 	 "1:"
 	 : "=a" (result)
 	 : "D" (bits), "b" (bits), "c" ((len + 31) / 32)
-	 : "dx", "di");
+	 : "dx");
     return result;
 }
  

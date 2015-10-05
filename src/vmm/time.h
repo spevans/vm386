@@ -23,7 +23,10 @@ struct time_bits {
 
 extern __inline__ void __delay(int loops)
 {
-        __asm__(".align 2,0x90\n1:\tdecl %0\n\tjns 1b": :"a" (loops):"ax");
+        int d0;
+        asm volatile (".align 2,0x90\n1:\tdecl %0\n\tjns 1b"
+                      : "=a" (d0)
+                      :"0" (loops) );
 }
 
 #ifdef KERNEL
