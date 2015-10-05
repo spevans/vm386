@@ -11,8 +11,10 @@
 # define free kernel->free
 # define kprintf kernel->printf
 #else
-# define forbid() do ; while(0)
-# define permit() do ; while(0)
+void *malloc(size_t size);
+
+# define forbid() do {} while(0)
+# define permit() do {} while(0)
 #endif
 
 

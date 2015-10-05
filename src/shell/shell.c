@@ -8,6 +8,7 @@
 # include <vmm/fs.h>
 #else
 # define __NO_TYPE_CLASHES
+# include <unistd.h>
 # include <sys/types.h>
 # include <stdio.h>
 # include <vmm/types.h>
@@ -23,6 +24,10 @@
 #ifndef TEST_SHELL
 # define kvsprintf kernel->vsprintf
 # define kprintf kernel->printf
+#else
+# define kprintf printf
+# define kvsprintf vsprintf
+#include <stdio.h>
 #endif
 
 struct shell_module shell_module =
