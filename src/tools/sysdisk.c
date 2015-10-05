@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <vmm/fs.h>
 #include <string.h>
-
+#include "../fs/bootsect.h"
 #define	BOOT_PARAMS	453
 
 #define BYTE_BOOT_PARAM(x)	*((unsigned char *)(&bpb.boot_code[BOOT_PARAMS+x]))
@@ -80,6 +80,17 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "error: cant open %s\n", argv[4]);
 		return 1;
 	}
+
+	if(argv[3][0] == 'f') {
+		boot_dev = atoi(&argv[3][2]);
+	} else {
+		boot_dev = 128 + (argv[3][2] - 'a');
+	}
+
+	get_info(argv[3], &lba, &cylsec, &head);
+	printf("Bootdev: %d LBA: %lu CYL/SEC: %4.4X HEADS: %2.2X\n",
+		boot_dev, lba, cylsec, head);
+
 	fread(&bpb, 1, FS_BLKSIZ, sys_file);
 	if(bpb.magic != FS_BOOT_MAGIC) {
 		fprintf(stderr, "%s:bad magic number\n", argv[4]);
@@ -104,14 +115,6 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	if(argv[3][0] == 'f') {
-		boot_dev = atoi(&argv[3][2]);
-	} else {
-		boot_dev = 128 + (argv[3][2] - 'a');
-	}
-
-        get_info(argv[3], &lba, &cylsec, &head);
-	fprintf(stderr, "Bootdev: %d\n", boot_dev);
 
 	rewind(sys_file);
 	sector_len = (start16_len / 512);
@@ -121,6 +124,8 @@ int main(int argc, char *argv[])
         BYTE_BOOT_PARAM(2) = head; /* head */
         DWORD_BOOT_PARAM(3) = lba + (FS_BLKSIZ / 512); /* lba start */
         DWORD_BOOT_PARAM(7) = sector_len;
+        printf("start16 LBA: %lu sector length = %lu\n", DWORD_BOOT_PARAM(3),
+               DWORD_BOOT_PARAM(7));
 
         DWORD_BOOT_PARAM(14) = lba + sector_len + 2;
 
@@ -131,7 +136,8 @@ int main(int argc, char *argv[])
         BYTE_BOOT_PARAM(13)= 0;
         DWORD_BOOT_PARAM(18) = sector_len;
         BYTE_BOOT_PARAM(22) = (unsigned char)boot_dev;
-
+        printf("kernel LBA: %lu sector length = %lu\n", DWORD_BOOT_PARAM(14),
+               DWORD_BOOT_PARAM(18));
 
 	fwrite(&bpb, 1, FS_BLKSIZ, sys_file);
 	write_out(start16, start16_len, sys_file);
@@ -202,10 +208,8 @@ void get_info(char *dev, unsigned long *lba,
   p = (hd_partition_t *)(mbr + 0x1be);
   for(i = 0; i < 4; i++, p++) {
 #if 0
-    printf("Partition: %d System: %d LBA: %lu Head: %d CylSec: %d Len: %
-lu\n",
-        i+1, p->system, p->LBA_start, p->start_head, p->start_cylsec, p-
->part_len);
+    printf("Partition: %d System: %d LBA: %lu Head: %d CylSec: %d Len: %lu\n",
+        i+1, p->system, p->LBA_start, p->start_head, p->start_cylsec, p->part_len);
 #endif
     if(p->system == 5) {
         char embr[512];
@@ -223,11 +227,9 @@ lu\n",
                 }
                 ext = (hd_partition_t *)(embr + 0x1be);
 #if 0
-                printf("Partition: %d System: %d LBA: %lu Head: %d CylSe
-c: %d Len: %lu\n",
+                printf("Partition: %d System: %d LBA: %lu Head: %d CylSec: %d Len: %lu\n",
                         ext_part, ext->system, ext->LBA_start + cur,
-                        ext->start_head, ext->start_cylsec, ext->part-le
-n);
+                        ext->start_head, ext->start_cylsec, ext->part-len);
 #endif
                 if(partition == ext_part) {
                         *head = ext->start_head;

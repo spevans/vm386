@@ -81,6 +81,10 @@ int main(int argc, char *argv[])
 	kernel = do_open(argv[3]);
 
 	boot_len = get_filelen(boot);
+        if (boot_len != 512) {
+                fprintf(stderr, "Bootsector not 512 bytes (%d)\n", boot_len);
+                exit(1);
+        }
 	start16_len = get_filelen(start16);
 	kernel_len = get_filelen(kernel);
 

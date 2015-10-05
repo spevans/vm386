@@ -9,6 +9,9 @@
 #define WORD_BOOT_PARAM(x)	*((unsigned short int *)(&bpb.boot_code[BOOT_PARAMS+x]))
 #define DWORD_BOOT_PARAM(x)	*((unsigned int *)(&bpb.boot_code[BOOT_PARAMS+x]))
 
+void exit(int status);
+
+
 FILE *do_open(char *file)
 {
 	FILE *fp;
@@ -27,11 +30,19 @@ int main(int argc, char *argv[])
 	struct boot_blk bpb;
 
 	if(argc < 2) {
-		fprintf(stderr, "usage: sbb bootdev\n");
+		fprintf(stderr, "usage: sbb bootdev [offset]\n");
 		return 1;
 	}
-
 	bb_file = do_open(argv[1]);
+        if (argc == 3) {
+                long offset = atol(argv[2]);
+                printf("offset = %ul\n", offset);
+                if (fseek(bb_file, offset, SEEK_SET) != offset) {
+                        perror("fseek: ");
+                        return 1;
+                }
+        }
+
 	fread(&bpb, 1, FS_BLKSIZ, bb_file);
 	fclose(bb_file);
 	printf("Boot Device: %02x\n", BYTE_BOOT_PARAM(22));

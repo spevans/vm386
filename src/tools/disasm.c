@@ -11,6 +11,7 @@
 
 /*#include "imp.h"*/
 /*#include "global.h"*/
+#include <string.h>
 #include <stdio.h>
 #include <assert.h>
 #include <stdarg.h>
@@ -398,7 +399,7 @@ static	char	*floatops[] = {
   "FBLDT",            "FILDQ",           "FBSTPT",         "FISTPQ"
 };
 
-FILE *listfp = stdout;
+FILE *listfp;
 void ncode(unsigned char *, unsigned char *, unsigned int, char);
 unsigned int hex_to_int(char *);
 
@@ -428,7 +429,7 @@ int main(int argc, char **argv)
 	unsigned int start = 0, end = -1, address = 0; 
 	unsigned int len, filelen;
 	FILE *fp;
-	char *buf;
+	unsigned char *buf;
 	char is_32bit = 1;
 
 	if(argc < 2) {
@@ -436,7 +437,8 @@ int main(int argc, char **argv)
 		"usage: disasm file [-16] [-s start] [-e end] [-a address]\n");
 		return 1;
 	}
-	
+
+        listfp = stdout;
 	argv++;
 	fp = fopen(*argv, "r");
 	if(fp == NULL) {
@@ -485,7 +487,7 @@ int main(int argc, char **argv)
 	
 	printf("start: %05X\tend: %05X\taddress: %05X\n",
 		start, end, address);
-	buf = (char *)malloc(len);
+	buf = malloc(len);
 	if(buf == NULL) {
 		fprintf(stderr, "error: out of memory\n");
 		return 1;

@@ -1,8 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <memory.h>
 
 #define HEADER_SIZE	32
+#define HEADER_MAGIC    0x04100301
+
 
 void quit(char *s)
 {
@@ -11,11 +14,17 @@ void quit(char *s)
 }
 
 
-void main(int argc, char *argv[])
+uint32_t data(char *buffer, unsigned int idx)
+{
+        return ((uint32_t *)buffer)[idx];
+}
+
+
+int main(int argc, char *argv[])
 {
 	FILE *fpin, *fpout;
 	char buffer[512];
-	long c,d,b,s;
+	uint32_t c,d,b,s;
 	int i;
 	
 	if(argc < 3) {
@@ -25,26 +34,38 @@ void main(int argc, char *argv[])
 	fpin = fopen(argv[1], "r");
 	if(fpin == NULL) {
 		quit("cant open input file\n");
-	}	
-	fpout = fopen(argv[2], "w");
-	if(fpout == NULL) {
-		quit("cant open output file\n");
-	}	
+	}
+
 	fread(&buffer, HEADER_SIZE, 1, fpin);
-	if(((long *) buffer)[0] != (0x04100301))
-		quit("bad header\n");
-	if(((long *) buffer)[1] != (HEADER_SIZE))
-		quit("bad header\n");
-	c = ((long *) buffer)[2];
+        uint32_t magic = data(buffer, 0);
+
+        printf("sizeof = %d Magic = %8.8X\n", sizeof(magic), magic);
+        if (magic != HEADER_MAGIC)
+		quit("bad header - cant find magic number\n");
+
+        uint32_t header_sz = data(buffer, 1);
+	if(header_sz != HEADER_SIZE) {
+                char buf[64];
+                sprintf(buf, "bad header - incorrect size %u != %lu\n", header_sz, HEADER_SIZE);
+		quit(buf);
+        }
+
+	c = data(buffer, 2);
 	printf("Code Size: %lu bytes\n", c);
-	d = ((long *) buffer)[3];
+	d = data(buffer, 3);
 	printf("Data Size: %lu bytes\n", d);
-	b = ((long *) buffer)[4];
+	b = data(buffer, 4);
 	printf("Bss Size: %lu bytes\n", b);
-	s = ((long *) buffer)[7];
+	s = data(buffer, 7);
 	printf("Symbol Table Size: %lu bytes\n", s);
 	if(d|b|s)
 		quit("Only a code segment should be present\n");
+
+        fpout = fopen(argv[2], "w");
+	if(fpout == NULL) {
+		quit("cant open output file\n");
+	}
+
 	do {
 		memset(buffer, 0, 512);
 		i = fread(&buffer, 1, 512, fpin);
@@ -52,4 +73,6 @@ void main(int argc, char *argv[])
 	} while(i == 512);
 	fclose(fpin);
 	fclose(fpout);
+
+        return 0;
 }
