@@ -9,6 +9,9 @@
 
 #ifndef TEST
 #define kprintf kernel->printf
+#else
+# define kprintf printf
+#include <stdio.h>
 #endif
 
 struct fs_device *device_list;
@@ -50,7 +53,7 @@ free_device(struct fs_device *dev)
 #define TO_UPPER(c) ((((c) >= 'a') && ((c) <= 'z')) ? ((c) + 0x20) : (c))
 
 static inline int
-devcmp(const u_char *p1, const u_char *p2)
+devcmp(const char *p1, const char *p2)
 {
     /* I borrowed this from the Linux C library :-) */
     register int ret;

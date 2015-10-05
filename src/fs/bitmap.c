@@ -8,6 +8,9 @@
 #include <vmm/kernel.h>
 #ifndef TEST
 # define kprintf kernel->printf
+#else
+# define kprintf printf
+#include <stdio.h>
 #endif
 
 

@@ -5,9 +5,9 @@
 # include <unistd.h>
 # include <fcntl.h>
 # include <stdio.h>
-# define __NO_TYPE_CLASHES
 #endif
 
+#include <vmm/types.h>
 #include <vmm/fs.h>
 #include <vmm/errno.h>
 #include <vmm/hd.h>
@@ -320,7 +320,7 @@ cmd_rmdir(struct shell *sh, int argc, char **argv)
 }
 
 #define DOC_mv "mv SOURCE-FILE DEST-FILE\n\
-Rename the file SOURCE-FILE as DEST-FILE, note that you can't move files
+Rename the file SOURCE-FILE as DEST-FILE, note that you can't move files\
 across devices."
 int
 cmd_mv(struct shell *sh, int argc, char **argv)

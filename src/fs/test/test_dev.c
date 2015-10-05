@@ -1,16 +1,19 @@
 /* test_dev.c -- Simulate a device with a Unix file.
    John Harper. */
 
-#include <unistd.h>
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <errno.h>
-#include <stdio.h>
-
-#define __NO_TYPE_CLASHES
 #include <vmm/fs.h>
 #include <vmm/errno.h>
 #include <vmm/shell.h>
+
+#include <unistd.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <errno.h>
+
+
+
 
 int dev_fd = -1;
 size_t dev_size;

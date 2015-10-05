@@ -10,6 +10,10 @@
 #ifndef TEST
 # define kprintf kernel->printf
 # define kvsprintf kernel->vsprintf
+#else
+# define kprintf printf
+# define kvsprintf vsprintf
+#include <stdio.h>
 #endif
 
 /* Really need buffered I/O for this type of thing :-(  */

@@ -53,7 +53,10 @@ make_inode(struct fs_device *dev, u_long inum)
     if(!test_media(dev))
 	return NULL;
     FORBID();
+
+#ifndef TEST
 again:
+#endif
     inode = inode_open_list;
     while(inode != NULL)
     {

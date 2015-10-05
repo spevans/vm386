@@ -5,9 +5,13 @@
 #include <vmm/errno.h>
 #include <vmm/kernel.h>
 #include <vmm/io.h>
+#include <vmm/string.h>
 
 #ifndef TEST
 # define kprintf kernel->printf
+#else
+# define kprintf printf
+#include <stdio.h>
 #endif
 
 
