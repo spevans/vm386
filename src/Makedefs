@@ -72,7 +72,6 @@ endif
 # `_FOO_module'.
 %.module :
 	$(CC) -c $(TOPDIR)/kernel/modules/crt0.S -o $*_crt0.o -DMODNAME=$*
-	$(CC) -c $(TOPDIR)/kernel/modules/crt1.S -o $*_crt1.o -DMODNAME=$*
 	$(LD) $(LDFLAGS) -r $*_crt0.o $^ -o $@.o
 	$(NM) $@.o | grep -v '_compiled' | sort >$@.map
 	cp $@.o $@

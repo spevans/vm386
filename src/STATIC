@@ -1,3 +1,9 @@
-fs/fs.module
-drivers/physical/hd/hd.module
-syslogd/syslogd.module
+fs/fs
+drivers/physical/ramdisk/ramdisk
+syslogd/syslogd
+drivers/physical/kbd/kbd
+drivers/virtual/vpic/vpic
+drivers/virtual/vm/vm
+drivers/virtual/video/video
+drivers/physical/tty/tty
+shell/shell
