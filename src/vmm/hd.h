@@ -14,7 +14,7 @@ typedef struct hd_partition {
     u_long start;
     u_long size;
     struct hd_dev *hd;
-    u_char name[PARTN_NAME_MAX];
+    char name[PARTN_NAME_MAX];
 } hd_partition_t;
 
 typedef struct hd_dev {

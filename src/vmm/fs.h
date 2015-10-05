@@ -292,8 +292,8 @@ struct fs_module {
 #else
 # define CURRENT_DIR current_dir
 extern struct file *current_dir;
-# define FORBID() do ; while(0)
-# define PERMIT() do ; while(0)
+# define FORBID() do {} while(0)
+# define PERMIT() do {} while(0)
 #endif
 
 

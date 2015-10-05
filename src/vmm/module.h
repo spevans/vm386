@@ -64,7 +64,7 @@ struct module {
        opened. */
     short	   open_count;
 
-    char	  *mod_start;
+    void	  *mod_start;
     size_t	   mod_size;
 
     /* When the module is first loaded this function is called (unless it's

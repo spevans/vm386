@@ -55,10 +55,10 @@ struct tty_module {
     void (*next_tty)(void);
     void (*prev_tty)(void);
 
-    void (*print)(struct tty *tty, const u_char *buf);
-    void (*printn)(struct tty *tty, const u_char *buf, size_t length);
-    void (*printf)(struct tty *tty, const u_char *fmt, ...);
-    void (*vprintf)(struct tty *tty, const u_char *fmt, va_list args);
+    void (*print)(struct tty *tty, const char *buf);
+    void (*printn)(struct tty *tty, const char *buf, size_t length);
+    void (*printf)(struct tty *tty, const char *fmt, ...);
+    void (*vprintf)(struct tty *tty, const char *fmt, va_list args);
     void (*clear)(struct tty *tty);
     void (*clear_chars)(struct tty *tty, size_t length);
     void (*set_cursor)(struct tty *tty, short x, short y);

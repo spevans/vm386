@@ -30,8 +30,5 @@ struct vprinter_module {
     void (*printer_get_status)(struct vm *vm, struct vm86_regs *regs);
 };
 extern struct vprinter_module vprinter_module;
-extern void printer_write_char(struct vm *vm, struct vm86_regs *regs);
-extern void printer_initialise(struct vm *vm, struct vm86_regs *regs);
-extern void printer_get_status(struct vm *vm, struct vm86_regs *regs);
 
 #endif /* __VMM_VPRINTER_H */

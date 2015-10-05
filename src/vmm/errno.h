@@ -38,10 +38,8 @@ extern int vmm_errno;
 #define E_NOTLINK	20	/* Object isn't a symbolic link. */
 #define E_MAXLINKS	21	/* Too many symbolic links. */
 
-#ifdef KERNEL
-extern const char *error_string(int errno);
+extern const char *error_string(int err);
 extern const char *error_table[];
 extern int max_err;
-#endif
 
 #endif /* __VMM_ERRNO_H */

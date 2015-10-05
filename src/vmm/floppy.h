@@ -91,6 +91,7 @@ extern bool floppy_mkfs_partition(void);
 extern long floppy_force_seek(fd_dev_t *fd, u_long cyl);
 
 extern bool add_floppy_commands(void);
+extern void remove_floppy_commands(void);
 extern bool floppy_init(void);
 
 struct fd_module {

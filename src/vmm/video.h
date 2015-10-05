@@ -18,7 +18,7 @@ struct video_ops;
 
 struct mode_info {
     short cols, rows;
-    char *buffer;			/* In USER space. */
+    u_char *buffer;			/* In USER space. */
     size_t page_size;
     u_char pages;
     bool text_mode, colour;

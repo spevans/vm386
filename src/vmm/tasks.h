@@ -103,7 +103,6 @@ struct task_list {
 
 /* from sched.c */
 extern struct task *current_task;
-extern list_t running_tasks, suspended_tasks;
 extern bool need_resched;
 extern void append_task(struct task *task);
 extern void remove_task(struct task *task);

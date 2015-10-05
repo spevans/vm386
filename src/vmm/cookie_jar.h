@@ -5,6 +5,9 @@
 
 #define __PACK__ __attribute__ ((packed))
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wattributes"
+
 struct hd_info {
 	u_int16	cylinders	__PACK__ ;
 	u_int8	heads		__PACK__ ;
@@ -45,5 +48,6 @@ struct cookie_jar {
 };
 
 extern struct cookie_jar cookie;
-	
+
+#pragma GCC diagnostic pop
 #endif

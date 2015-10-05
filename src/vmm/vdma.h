@@ -70,10 +70,6 @@ struct vdma_module {
     void (*set_dma_info)(struct vm *vm, u_int channel, struct channel_info *info);
 };
 
-extern void delete_vdma(struct vm *vm);
-extern void get_dma_info(struct vm *vm, u_int channel, struct channel_info *info);
-extern void set_dma_info(struct vm *vm, u_int channel, struct channel_info *info);
-
 extern struct vdma_module vdma_module;
 
 #define	DMA0_LOW	0x00

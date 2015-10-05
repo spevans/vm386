@@ -76,7 +76,7 @@ min(int v1, int v2)
 #ifdef DEBUG
 # define DB(x) kprintf x
 #else
-# define DB(x) do ; while(0)
+# define DB(x) do {} while(0)
 #endif
 
 #endif /* _VMM_TYPES_H */

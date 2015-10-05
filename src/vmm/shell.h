@@ -25,7 +25,7 @@ struct shell_cmds {
 	const char *name;
 	int (*func)(struct shell *, int, char **);
 	const char *doc;
-    } cmds[0];
+    } cmds[];
 };
 
 #define CMD(name) __CMD(#name, cmd_ ## name, DOC_ ## name)
