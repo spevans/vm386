@@ -137,7 +137,7 @@ extern void describe_tasks(struct shell *sh);
    functions nest, that is if you call forbid() twice you have to sub-
    sequently call permit() twice before the task can be pre-empted. */
 
-extern inline void
+static inline void
 forbid(void)
 {
 #ifndef KERNEL
@@ -147,7 +147,7 @@ forbid(void)
 #endif
 }
 
-extern inline void
+static inline void
 permit(void)
 {
 #ifndef KERNEL
@@ -169,7 +169,7 @@ struct semaphore {
 
 /* The current task releases its ownership of the semaphore SEM. This may
    be called from interrupts. */
-extern inline void
+static inline void
 signal(struct semaphore *sem)
 {
     if(sem->waiting == NULL)
@@ -187,7 +187,7 @@ signal(struct semaphore *sem)
 /* Request ownership of the semaphore SEM, the current task will sleep
    until it's available. Note that this *may not* be called from an
    interrupt. */
-extern inline void
+static inline void
 wait(struct semaphore *sem)
 {
     int was_blocked;
@@ -205,7 +205,7 @@ wait(struct semaphore *sem)
 }
 
 /* Initialise a semaphore to be blocked. */
-extern inline void
+static inline void
 set_sem_blocked(struct semaphore *sem)
 {
     sem->blocked = TRUE;
@@ -213,7 +213,7 @@ set_sem_blocked(struct semaphore *sem)
 }
 
 /* Initialise a semaphore to be open. */
-extern inline void
+static inline void
 set_sem_clear(struct semaphore *sem)
 {
     sem->blocked = FALSE;

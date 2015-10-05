@@ -36,7 +36,7 @@ typedef struct __list {
 
 
 /* Initialise a list structure so that LIST is empty. */
-extern inline void
+static inline void
 init_list(list_t *list)
 {
     list->tailpred = (list_node_t *)&list->head;
@@ -45,7 +45,7 @@ init_list(list_t *list)
 }
 
 /* Append the node NODE to the end of the list LIST. */
-extern inline void
+static inline void
 append_node(list_t *list, list_node_t *node)
 {
     list_node_t *tmp, *tmp2;
@@ -58,7 +58,7 @@ append_node(list_t *list, list_node_t *node)
 }
 
 /* Put the node NODE onto the front of the list LIST. */
-extern inline void
+static inline void
 prepend_node(list_t *list, list_node_t *node)
 {
     list_node_t *tmp = list->head;
@@ -69,8 +69,8 @@ prepend_node(list_t *list, list_node_t *node)
 }
 
 /* Insert the node NODE into the list LIST after the node PREV. */
-extern inline void
-insert_node(list_t *list, list_node_t *node, list_node_t *prev)
+static inline void
+insert_node(__attribute__((unused)) list_t *list, list_node_t *node, list_node_t *prev)
 {
     list_node_t *tmp = prev->succ;
     if(tmp != NULL)
@@ -91,7 +91,7 @@ insert_node(list_t *list, list_node_t *node, list_node_t *prev)
 }
 
 /* Remove the node NODE from the list it is in. */
-extern inline void
+static inline void
 remove_node(list_node_t *node)
 {
     list_node_t *tmp = node->succ;
@@ -101,7 +101,7 @@ remove_node(list_node_t *node)
 }
 
 /* TRUE if the list L is empty. */
-extern inline bool
+static inline bool
 list_empty_p(list_t *list)
 {
     return list->tailpred == (list_node_t *)list;

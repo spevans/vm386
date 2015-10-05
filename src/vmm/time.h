@@ -48,7 +48,7 @@ struct timer_req {
 #define TIMER_TASK 0
 #define TIMER_FUNC 1
 
-extern inline void
+static inline void
 set_timer_sem(struct timer_req *req, u_long ticks)
 {
     req->wakeup_ticks = ticks;
@@ -56,7 +56,7 @@ set_timer_sem(struct timer_req *req, u_long ticks)
     req->type = TIMER_TASK;
 }
 
-extern inline void
+static inline void
 set_timer_func(struct timer_req *req, u_long ticks,
 	       void (*func)(void *), void *user_data)
 {
@@ -66,7 +66,7 @@ set_timer_func(struct timer_req *req, u_long ticks,
     req->type = TIMER_FUNC;
 }
 
-extern inline void
+static inline void
 set_timer_interval(struct timer_req *req, u_long ticks)
 {
     req->wakeup_ticks = ticks;

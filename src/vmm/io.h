@@ -9,7 +9,7 @@
 
 /* Standard I/O functions. */
 
-extern inline u_char
+static inline u_char
 inb(u_short port)
 {
     u_char res;
@@ -17,13 +17,13 @@ inb(u_short port)
     return res;
 }
 
-extern inline void
+static inline void
 outb(u_char value, u_short port)
 {
     asm volatile ("outb %b0,%w1" : : "a" (value), "d" (port));
 }
 
-extern inline u_short
+static inline u_short
 inw(u_short port)
 {
     u_short res;
@@ -31,13 +31,13 @@ inw(u_short port)
     return res;
 }
 
-extern inline void
+static inline void
 outw(u_short value, u_short port)
 {
     asm volatile ("outw %w0,%w1" : : "a" (value), "d" (port));
 }
 
-extern inline u_long
+static inline u_long
 inl(u_short port)
 {
     u_long res;
@@ -45,7 +45,7 @@ inl(u_short port)
     return res;
 }
 
-extern inline void
+static inline void
 outl(u_long value, u_short port)
 {
     asm volatile ("outl %l0,%w1" : : "a" (value), "d" (port));
@@ -54,7 +54,7 @@ outl(u_long value, u_short port)
 
 /* I/O functions which pause after accessing the port. */
 
-extern inline void
+static inline void
 io_pause(void)
 {
 #if 0
@@ -64,14 +64,14 @@ io_pause(void)
 #endif
 }
 
-extern inline void
+static inline void
 outb_p(u_char value, u_short port)
 {
     outb(value, port);
     io_pause();
 }
 
-extern inline u_char
+static inline u_char
 inb_p(u_short port)
 {
     u_char c = inb(port);
@@ -79,14 +79,14 @@ inb_p(u_short port)
     return c;
 }
 
-extern inline void
+static inline void
 outw_p(u_short value, u_short port)
 {
     outw(value, port);
     io_pause();
 }
 
-extern inline u_short
+static inline u_short
 inw_p(u_short port)
 {
     u_short w = inw(port);
@@ -94,14 +94,14 @@ inw_p(u_short port)
     return w;
 }
 
-extern inline void
+static inline void
 outl_p(u_long value, u_short port)
 {
     outl(value, port);
     io_pause();
 }
 
-extern inline u_long
+static inline u_long
 inl_p(u_short port)
 {
     u_long l = inl(port);
@@ -112,7 +112,7 @@ inl_p(u_short port)
 
 /* Block I/O functions. */
 
-extern inline void
+static inline void
 insb(void *buf, int count, u_short port)
 {
     asm volatile ("cld\n\t"
@@ -122,7 +122,7 @@ insb(void *buf, int count, u_short port)
 		  : "edi", "ecx", "memory");
 }
 
-extern inline void
+static inline void
 outsb(void *buf, int count, u_short port)
 {
     asm volatile ("cld\n\t"
@@ -132,7 +132,7 @@ outsb(void *buf, int count, u_short port)
 		  : "esi", "ecx", "memory");
 }
 
-extern inline void
+static inline void
 insw(void *buf, int count, u_short port)
 {
     asm volatile ("cld\n\t"
@@ -142,7 +142,7 @@ insw(void *buf, int count, u_short port)
 		  : "edi", "ecx", "memory");
 }
 
-extern inline void
+static inline void
 outsw(void *buf, int count, u_short port)
 {
     asm volatile ("cld\n\t"
@@ -152,7 +152,7 @@ outsw(void *buf, int count, u_short port)
 		  : "esi", "ecx", "memory");
 }
 
-extern inline void
+static inline void
 insl(void *buf, int count, u_short port)
 {
     asm volatile ("cld\n\t"
@@ -162,7 +162,7 @@ insl(void *buf, int count, u_short port)
 		  : "edi", "ecx", "memory");
 }
 
-extern inline void
+static inline void
 outsl(void *buf, int count, u_short port)
 {
     asm volatile ("cld\n\t"

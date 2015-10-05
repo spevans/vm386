@@ -9,7 +9,7 @@
 #include <vmm/types.h>
 
 /* Unfortunately Linux doesn't define stpcpy() so here's my attempt.. */
-extern inline char *
+static inline char *
 stpcpy(char *dest, const char *src)
 {
     /* Need the `volatile' keyword so gcc doesn't assume it's free
@@ -42,7 +42,7 @@ stpcpy(char *dest, const char *src)
  *		Copyright (C) 1991, 1992 Linus Torvalds
  */
  
-extern inline char *
+static inline char *
 strcpy(char *dest, const char *src)
 {
     asm ("cld\n"
@@ -56,7 +56,7 @@ strcpy(char *dest, const char *src)
     return dest;
 }
 
-extern inline char *
+static inline char *
 strncpy(char *dest, const char *src, size_t count)
 {
     asm ("cld\n"
@@ -75,7 +75,7 @@ strncpy(char *dest, const char *src, size_t count)
     return dest;
 }
 
-extern inline char *
+static inline char *
 strcat(char *dest, const char *src)
 {
     asm ("cld\n\t"
@@ -92,7 +92,7 @@ strcat(char *dest, const char *src)
     return dest;
 }
 
-extern inline char *
+static inline char *
 strncat(char *dest, const char *src, size_t count)
 {
     asm ("cld\n\t"
@@ -115,7 +115,7 @@ strncat(char *dest, const char *src, size_t count)
     return dest;
 }
 
-extern inline int
+static inline int
 strcmp(const char *cs, const char *ct)
 {
     register int __res;
@@ -137,7 +137,7 @@ strcmp(const char *cs, const char *ct)
     return __res;
 }
 
-extern inline int
+static inline int
 strncmp(const char *cs, const char *ct, size_t count)
 {
     register int __res;
@@ -161,7 +161,7 @@ strncmp(const char *cs, const char *ct, size_t count)
     return __res;
 }
 
-extern inline char *
+static inline char *
 strchr(const char *s, char c)
 {
     register char *__res;
@@ -252,7 +252,7 @@ strcspn(const char *cs, const char *ct)
     return __res-cs;
 }
 
-extern inline char *
+static inline char *
 strpbrk(const char *cs, const char *ct)
 {
     register char *__res;
@@ -281,7 +281,7 @@ strpbrk(const char *cs, const char *ct)
     return __res;
 }
 
-extern inline char *
+static inline char *
 strstr(const char *cs, const char *ct)
 {
     register char *__res;
@@ -312,7 +312,7 @@ strstr(const char *cs, const char *ct)
     return __res;
 }
 
-extern inline size_t
+static inline size_t
 strlen(const char *s)
 {
     register int __res;
@@ -332,7 +332,7 @@ strlen(const char *s)
    an object file somewhere? */
 extern char *___strtok;
 
-extern inline char *
+static inline char *
 strtok(char *s, const char *ct)
 {
     register char *__res;
@@ -393,8 +393,8 @@ strtok(char *s, const char *ct)
 }
 #endif
 
-extern inline void *
-memcpy(void *to, const void *from, size_t n)
+static inline void *
+memcpy(void *dest, const void *src, size_t n)
 {
     asm ("cld\n\t"
 	 "movl %%edx, %%ecx\n\t"
@@ -413,7 +413,7 @@ memcpy(void *to, const void *from, size_t n)
     return to;
 }
 
-extern inline void *
+static inline void *
 memmove(void *dest, const void *src, size_t n)
 {
     if (dest < src)
@@ -440,7 +440,7 @@ memmove(void *dest, const void *src, size_t n)
     return dest;
 }
 
-extern inline int
+static inline int
 memcmp(const void *cs, const void *ct, size_t count)
 {
     register int __res;
@@ -458,7 +458,7 @@ memcmp(const void *cs, const void *ct, size_t count)
     return __res;
 }
 
-extern inline void *
+static inline void *
 memchr(const void *cs, char c, size_t count)
 {
     register void * __res;
@@ -476,7 +476,7 @@ memchr(const void *cs, char c, size_t count)
     return __res;
 }
 
-extern inline void *
+static inline void *
 memset(void *s, char c, size_t count)
 {
     asm ("cld\n\t"
@@ -488,7 +488,7 @@ memset(void *s, char c, size_t count)
     return s;
 }
 
-extern inline void *
+static inline void *
 memsetw(void *s, u_short w, size_t count)
 {
     asm ("cld\n\t"
@@ -500,7 +500,7 @@ memsetw(void *s, u_short w, size_t count)
     return s;
 }
 
-extern inline void *
+static inline void *
 memsetl(void *s, u_long l, size_t count)
 {
     asm ("cld\n\t"
@@ -520,7 +520,7 @@ memsetl(void *s, u_long l, size_t count)
 #define __NO_TYPE_CLASHES
 #include <vmm/types.h>
 
-extern inline char *
+static inline char *
 stpcpy(char *dst, const char *src)
 {
     while((*dst++ = *src++))
@@ -530,14 +530,14 @@ stpcpy(char *dst, const char *src)
 
 #endif /* !i386 */
 
-extern inline u_char
+static inline u_char
 tolower(register u_char c)
 {
     return ((c < 'A') || (c > 'Z')) ? c : (c + ('a' - 'A'));
 }
 
 /* This is borrowed from the Linux C library :) */
-extern inline int
+static inline int
 strcasecmp(const char *s1, const char *s2)
 {
   register const unsigned char *p1 = (const unsigned char *) s1;

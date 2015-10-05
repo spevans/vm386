@@ -75,7 +75,7 @@ extern void shell_to_front(void);
 extern void shell_perror(struct shell *sh, const char *msg);
 extern bool source_file(struct shell *sh, const char *file_name);
 
-extern inline void
+static inline void
 put_string(struct shell *sh, const char *buf)
 {
     shell_print(sh, buf, strlen(buf));

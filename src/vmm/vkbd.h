@@ -39,7 +39,7 @@ struct vkbd {
 #define VK_BUF_UP_KEY	0x00010000
 #define VK_BUF_SHIFT	0x00020000
 
-extern inline bool
+static inline bool
 vkbd_is_empty(struct vkbd *vk)
 {
     return vk->in_pos == vk->out_pos;

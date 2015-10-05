@@ -55,19 +55,19 @@ typedef char bool;
 #endif
 
 /* Round up VAL to the next multiple of MOD. */
-extern inline u_long
+static inline u_long
 round_to(u_long val, u_long mod)
 {
     return (val + (mod - 1)) & ~(mod - 1);
 }
 
-extern inline int
+static inline int
 max(int v1, int v2)
 {
     return v1 > v2 ? v1 : v2;
 }
 
-extern inline int
+static inline int
 min(int v1, int v2)
 {
     return v1 < v2 ? v1 : v2;

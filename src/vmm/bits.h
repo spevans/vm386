@@ -6,19 +6,19 @@
 
 #include <vmm/types.h>
 
-extern inline int
+static inline void
 set_bit(void *bit_string, int bit_offset)
 {
     ((char *)bit_string)[bit_offset / 8] |= (1 << (bit_offset % 8));
 }
 
-extern inline void
+static inline void
 clear_bit(void *bit_string, int bit_offset)
 {
     ((char *)bit_string)[bit_offset / 8] &= ~(1 << (bit_offset % 8));
 }
 
-extern inline int
+static inline int
 test_bit(void *bit_string, int bit_offset)
 {
     return ((char *)bit_string)[bit_offset / 8] & (1 << (bit_offset % 8));
@@ -30,7 +30,7 @@ test_bit(void *bit_string, int bit_offset)
    LEN is the number of bits to scan, note that it actually searches to the
    end of the word that the last bit lives in. -1 is returned if no zero
    bit is found. */
-extern inline int
+static inline int
 find_zero_bit(void *bits, int len)
 {
     long result;

@@ -95,7 +95,7 @@
 #define KB_8255_KBD_ACK		0x80
 
 /* Busy-wait for the input buffer to be empty. */
-extern inline void
+static inline void
 kbd_wait(void)
 {
     int i;
@@ -107,7 +107,7 @@ kbd_wait(void)
 }
 
 /* Busy-wait for the output buffer to be full. */
-extern inline void
+static inline void
 kbd_wait_output(void)
 {
     int i;
@@ -119,7 +119,7 @@ kbd_wait_output(void)
 }
 
 /* Send a command to the 8042. */
-extern inline void
+static inline void
 kbd_send_command(u_char command_byte)
 {
     kbd_wait();

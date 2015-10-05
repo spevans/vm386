@@ -65,13 +65,13 @@ typedef u_long page_dir;
 #define PF_ERROR_WRITE		2
 #define PF_ERROR_USER		4
 
-extern inline void
+static inline void
 flush_tlb(void)
 {
     asm volatile ("movl %%cr3,%%eax\n\tmovl %%eax,%%cr3" : : : "ax");
 }
 
-extern inline u_long
+static inline u_long
 get_cr2(void)
 {
     u_long res;

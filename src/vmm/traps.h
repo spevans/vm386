@@ -56,8 +56,8 @@ struct trap_regs {
 #define DBUG_BD		0x2000
 
 #define GET_DR(x)				\
-extern inline u_long				\
-get_dr ## x ## (void)				\
+static inline u_long				\
+get_dr ## x (void)				\
 {						\
     u_long res;					\
     asm ("movl %%db" #x ",%0" : "=r" (res));	\
@@ -72,8 +72,8 @@ GET_DR(1)
 GET_DR(0)
 
 #define SET_DR(x)				\
-extern inline void				\
-set_dr ## x ## (u_long val)			\
+static inline void				\
+set_dr ## x (u_long val)			\
 {						\
     asm ("movl %0,%%db" #x : : "r" (val));	\
 }

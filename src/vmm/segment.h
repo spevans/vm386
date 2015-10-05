@@ -26,25 +26,25 @@ extern desc_table GDT[], IDT[256];
    manually. :-( */
 #define SEG_FS ".byte 0x64"
 
-extern inline void
+static inline void
 put_user_byte(u_char val, u_char *addr)
 {
     asm (SEG_FS "; movb %b0,%1" : : "iq" (val), "m" (*addr));
 }
 
-extern inline void
+static inline void
 put_user_short(u_short val, u_short *addr)
 {
     asm (SEG_FS "; movw %0,%1" : : "ir" (val), "m" (*addr));
 }
 
-extern inline void
+static inline void
 put_user_long(u_long val, u_long *addr)
 {
     asm (SEG_FS "; movl %0,%1" : : "ir" (val), "m" (*addr));
 }
 
-extern inline u_char
+static inline u_char
 get_user_byte(u_char *addr)
 {
     u_char res;
@@ -52,7 +52,7 @@ get_user_byte(u_char *addr)
     return res;
 }
 
-extern inline u_short
+static inline u_short
 get_user_short(u_short *addr)
 {
     u_short res;
@@ -60,7 +60,7 @@ get_user_short(u_short *addr)
     return res;
 }
 
-extern inline u_long
+static inline u_long
 get_user_long(u_long *addr)
 {
     u_long res;
@@ -68,7 +68,7 @@ get_user_long(u_long *addr)
     return res;
 }
 
-extern inline void *
+static inline void *
 memcpy_from_user(void *to, void *from, size_t n)
 {
     asm ("cld\n\t"
@@ -88,7 +88,7 @@ memcpy_from_user(void *to, void *from, size_t n)
     return to;
 }
 
-extern inline void *
+static inline void *
 memcpy_to_user(void *to, void *from, size_t n)
 {
     asm ("pushw %%es\n\t"
@@ -111,7 +111,7 @@ memcpy_to_user(void *to, void *from, size_t n)
     return to;
 }
 
-extern inline void *
+static inline void *
 memcpy_user(void *to, void *from, size_t n)
 {
     asm ("pushw %%es\n\t"
@@ -134,7 +134,7 @@ memcpy_user(void *to, void *from, size_t n)
     return to;
 }
 
-extern inline void *
+static inline void *
 memset_user(void *s, u_char c, size_t count)
 {
     asm ("pushw %%es\n\t"
@@ -150,7 +150,7 @@ memset_user(void *s, u_char c, size_t count)
     return s;
 }
 
-extern inline void *
+static inline void *
 memsetw_user(void *s, u_short w, size_t count)
 {
     asm ("pushw %%es\n\t"
@@ -166,7 +166,7 @@ memsetw_user(void *s, u_short w, size_t count)
     return s;
 }
 
-extern inline void *
+static inline void *
 memsetl_user(void *s, u_long l, size_t count)
 {
     asm ("pushw %%es\n\t"
