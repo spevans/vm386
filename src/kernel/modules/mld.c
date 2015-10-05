@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <a.out.h>
 
@@ -33,9 +34,9 @@ struct mod_obj
 {
     struct exec hdr;
     size_t text_size;
-    u_char *text;
+    void *text;
     size_t data_size;
-    u_char *data;
+    void *data;
     size_t bss_size;
     u_long num_relocs;
     u_long *relocs;
@@ -118,7 +119,7 @@ error:
 static void
 read_a_out_obj(struct mod_obj *m, FILE *f, size_t fsiz)
 {
-    int i;
+    size_t i;
 
     /* Read the a.out header. */
     if(fseek(f, 0, SEEK_SET) != 0)

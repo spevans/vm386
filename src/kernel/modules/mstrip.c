@@ -11,10 +11,11 @@
 
    John Harper. */
 
-#include <sys/types.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <a.out.h>
 #define __NO_TYPE_CLASHES
 #include <vmm/types.h>

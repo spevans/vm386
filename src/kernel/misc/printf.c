@@ -161,7 +161,7 @@ kvsprintf(char *buf, const char *fmt, va_list args)
 		if(flags & PF_LONG)
 		    arg = va_arg(args, u_long);
 		else if(flags & PF_SHORT)
-		    arg = (u_long)va_arg(args, u_short);
+		    arg = (u_long)va_arg(args, int);
 		else
 		    arg = (u_long)va_arg(args, u_int);
 
@@ -217,7 +217,7 @@ kvsprintf(char *buf, const char *fmt, va_list args)
 		    if(arg == 0)
 		    {
 			/* NULL pointer */
-			(char *)arg = "(nil)";
+			arg = (u_long)"(nil)";
 			goto do_string;
 		    }
 		    flags |= PF_HASH;
@@ -386,7 +386,9 @@ ksprintf(char *buf, const char *fmt, ...)
     va_end(args);
 }
 
+#ifndef PRINT_STRING
 static void hack_print(const char *, size_t);
+#endif
 
 void
 kvprintf(const char *fmt, va_list args)
@@ -396,6 +398,7 @@ kvprintf(const char *fmt, va_list args)
     len = strlen(printf_buf);
 
 #ifdef PRINT_STRING
+    (void)len; // unused
     PRINT_STRING(printf_buf);
 #elif 1
     if(kprint_func != NULL)

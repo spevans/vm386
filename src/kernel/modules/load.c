@@ -87,10 +87,10 @@ free_module(struct module *mod)
    of the module's file, FH. */
 static bool
 fix_relocs(struct mod_hdr *hdr, struct file *fh, char *mod_start,
-	   size_t mod_size)
+	   __attribute__((unused)) size_t mod_size)
 {
 #define RBUFSIZ 64
-    int i = 0;
+    size_t i = 0;
     if(fs->seek(fh, M_RELOFF(*hdr), SEEK_ABS) >= 0)
     {
 	while(i < (hdr->reloc_size / 4))

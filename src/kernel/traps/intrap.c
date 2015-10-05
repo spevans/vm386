@@ -47,8 +47,8 @@ void dump_regs(struct trap_regs *regs, bool halt)
 	    }
 	    if(debug != NULL)
 	    {
-		debug->ncode((char *)(regs->eip - 10),
-			     (char *)(regs->eip + 10),
+		debug->ncode((unsigned char *)(regs->eip - 10),
+			     (unsigned char *)(regs->eip + 10),
 			     regs->eip - 10,
 			     FALSE, TRUE);
 	    }

@@ -27,16 +27,15 @@ volatile u_long timer_ticks;
 volatile u_long mums;
 static volatile time_t date;
 volatile unsigned long delay_loop_counter;
-static int cmos_time_update;
 
-static struct timer_req *timer_list;
 
 #ifndef TEST
-
+static struct timer_req *timer_list;
+static int cmos_time_update;
 
 /* Timer IRQ handler. */
 
-void
+static void
 timer_intr(void)
 {
 }
@@ -159,7 +158,7 @@ update_cmos_date()
 }
 
 #define CTICK_ADDR TO_LOGICAL(0xb8000 + 630, u_char *)
-void 
+static void
 cmos_timer(void)
 {
     static int got_date = 0;

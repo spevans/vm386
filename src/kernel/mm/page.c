@@ -385,7 +385,7 @@ init_mm(void)
 {
     logical_kernel_pd = TO_LOGICAL(kernel_page_dir, page_dir *);
     /* Set kernel_brk. */
-    kernel_brk = (char *)logical_top_of_kernel;
+    kernel_brk = (u_char *)logical_top_of_kernel;
 }
 
 void

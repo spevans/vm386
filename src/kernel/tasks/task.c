@@ -177,7 +177,10 @@ add_task(void *task, u_long flags, short pri, const char *name)
 		    /* Push the address of a routine to kill the current
 		       task onto the new task's stack, so that if it returns,
 		       it dies.. */
-		    *(--((u_long *)new_task->tss.esp)) = (u_long)kill_current_task;
+		    u_long *tmpesp = (u_long *)new_task->tss.esp;
+		    tmpesp--;
+		    new_task->tss.esp = (u_long)tmpesp;
+		    *tmpesp = (u_long)kill_current_task;
 		    append_task(new_task);	
 		    TaskCount++;
 		    return new_task;

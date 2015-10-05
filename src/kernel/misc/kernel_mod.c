@@ -67,7 +67,7 @@ struct kernel_module *kernel;
 
 struct fs_module *fs;
 
-extern char main;
+extern int main(int argc, char *argv[]);
 
 void
 kernel_mod_init(void)
