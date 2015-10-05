@@ -87,7 +87,7 @@ cmd_dis(struct shell *sh, int argc, char **argv)
 	start = kernel->strtoul(argv[0], NULL, 16);
     if(argc >= 2)
 	length = kernel->strtoul(argv[1], NULL, 16);
-    ncode((char *)start, (char *)(start + length), start, in_user, is_32bit);
+    ncode((unsigned char *)start, (unsigned char *)(start + length), (unsigned int)start, in_user, is_32bit);
     start += length;
     rc = 0;
  end:
@@ -400,7 +400,7 @@ int cmd_strsrch(struct shell *sh, int argc, char **argv)
 
 	if(argc > 0)
 	{
-		start = (u_char *)kernel->strtoul(*argv, NULL, 16);
+		start = (char *)kernel->strtoul(*argv, NULL, 16);
 		argc--; argv++;
 	}
 	if(argc > 0)
