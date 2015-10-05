@@ -6,9 +6,9 @@
 #define LABEL(x) __LABEL(x)
 #define __LABEL(x) x ## :
 
-#define MOD_STRUCT CONCAT3(_, MODNAME, _module)
-#define MOD_START  CONCAT3(__, MODNAME, _start)
-#define MOD_END    CONCAT3(__, MODNAME, _end)
+#define MOD_STRUCT CONCAT3(, MODNAME, _module)
+#define MOD_START  CONCAT3(_, MODNAME, _start)
+#define MOD_END    CONCAT3(_, MODNAME, _end)
 
 	.text
 	.globl	MOD_END

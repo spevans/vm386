@@ -36,9 +36,9 @@
 	leal	4(%esp),%esp	/* Pop ec */
 
 #define LOW_IRQ(n)				\
-	.globl __irq ## n;			\
+	.globl _irq ## n;			\
 	.align 2;				\
-__irq ## n:;					\
+_irq ## n:;					\
 	pushl	$0xDEAD1234;	/* Fake ec */	\
 	SAVE_REGS;				\
 	pushl	$ ## n;				\
@@ -66,10 +66,10 @@ LOW_IRQ(15)
 
 .align 2
 _do_irq:
-	incl	_intr_nest_count
+	incl	intr_nest_count
 
 	movl	(%esp),%ebx
-	movl	_Irq_handlers(,%ebx,4), %ebx
+	movl	Irq_handlers(,%ebx,4), %ebx
 	orl	%ebx, %ebx
 	jz	_no_func
 	call	*%ebx
@@ -82,17 +82,17 @@ _no_func:
 low_pic:
 	outb	%al, $0x20
 
-	decl	_intr_nest_count
+	decl	intr_nest_count
 	jnz	1f
-	cmpb	$0,_need_resched
+	cmpb	$0,need_resched
 	je	1f
-	call	_schedule
+	call	schedule
 1:
 	/* Check the return_hook */
-	cmpl	$0,_intr_nest_count
+	cmpl	$0,intr_nest_count
 	jne	1f
 	cli
-	movl	_current_task,%ebp
+	movl	current_task,%ebp
 	movl	RETURN_HOOK(%ebp),%eax
 	testl	%eax,%eax
 	jz	1f
@@ -105,7 +105,7 @@ low_pic:
 	iret
 
 	.data
-	.globl	_intr_nest_count
-_intr_nest_count:
+	.globl	intr_nest_count
+intr_nest_count:
 	/* This variable counts the number of nested interrupts/exceptions. */
 	.long	0

@@ -3,8 +3,8 @@
 .extern _first_esp;
 .extern _first_eip;
 
-.globl _start_task
-_start_task:
+.globl start_task
+start_task:
 	movl	$0x20, %ecx	# ss
 	push	%ecx
 	movl	_first_esp, %ecx

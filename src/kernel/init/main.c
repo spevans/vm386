@@ -13,7 +13,7 @@
 #include <vmm/vm.h>
 #include <vmm/time.h>
 
-extern char end, edata, etext;
+extern char _kernel_end, _data_end, _text_end;
 extern char root_dev[];
 
 unsigned int *PhysicalMem = (unsigned int *)PHYS_MAP_ADDR;
@@ -48,9 +48,9 @@ void main_kernel()
 	add_pages((u_long)logical_top_of_kernel, 0xA0000);
 	add_pages(0x100000, total_mem);
 
-	printk("End of Static Kernel at %08X\n", &end);
-	printk("End of Kernel data at %08X\n", &edata);
-	printk("End of Kernel text at %08X\n", &etext);
+	printk("End of Static Kernel at %08X\n", &_kernel_end);
+	printk("End of Kernel data at %08X\n", &_data_end);
+	printk("End of Kernel text at %08X\n", &_text_end);
 	printk("Page Directory at %08X\n",kernel_page_dir);
 	printk("Total Memory = %dK\n", total_mem / 1024);
 	printk("%d Pages added giving %dK free\n", free_page_count(),

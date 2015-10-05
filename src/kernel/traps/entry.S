@@ -52,22 +52,22 @@ name ## :					\
 	movl	$ ## name ## _handler,%eax;	\
 	jmp	_do_exception_handling
 
-TRAP_STUB(_divide_error)
-TRAP_STUB(_debug_exception)
-TRAP_STUB(_nmi)
-TRAP_STUB(_single_debug)
-TRAP_STUB(_overflow)
-TRAP_STUB(_bounds)
-TRAP_STUB(_invl_opcode)
-TRAP_STUB(_dna)
-TRAP_STUB_EC(_double_fault)
-TRAP_STUB(_copro_overrun)
-TRAP_STUB_EC(_invalid_tss)
-TRAP_STUB_EC(_seg_not_pres)
-TRAP_STUB_EC(_stack_seg)
-TRAP_STUB_EC(_gen_prot)
-TRAP_STUB_EC(_page_exception)
-TRAP_STUB(_co_pro_err)
+TRAP_STUB(divide_error)
+TRAP_STUB(debug_exception)
+TRAP_STUB(nmi)
+TRAP_STUB(single_debug)
+TRAP_STUB(overflow)
+TRAP_STUB(bounds)
+TRAP_STUB(invl_opcode)
+TRAP_STUB(dna)
+TRAP_STUB_EC(double_fault)
+TRAP_STUB(copro_overrun)
+TRAP_STUB_EC(invalid_tss)
+TRAP_STUB_EC(seg_not_pres)
+TRAP_STUB_EC(stack_seg)
+TRAP_STUB_EC(gen_prot)
+TRAP_STUB_EC(page_exception)
+TRAP_STUB(co_pro_err)
 
 /* Offsets into task structure */
 #define RETURN_HOOK 8
@@ -85,17 +85,17 @@ _do_exception_handling:
 	addl	$4,%esp
 
 	/* If possible, and it's required, call schedule(). */
-	cmpl	$0,_intr_nest_count
+	cmpl	$0,intr_nest_count
 	jne	1f
-	cmpb	$0,_need_resched
+	cmpb	$0,need_resched
 	je	1f
-	call	_schedule
+	call	schedule
 1:
 	/* Check the return_hook */
-	cmpl	$0,_intr_nest_count
+	cmpl	$0,intr_nest_count
 	jne	1f
 	cli
-	movl	_current_task,%eax
+	movl	current_task,%eax
 	movl	RETURN_HOOK(%eax),%eax
 	testl	%eax,%eax
 	jz	1f
