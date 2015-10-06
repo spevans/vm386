@@ -38,7 +38,7 @@ kill_vpic(struct vm *vm)
 }
 
 static bool
-create_vpic(struct vm *vmach, int argc, char **argv)
+create_vpic(struct vm *vmach, __attribute__ ((unused)) int argc, __attribute__ ((unused)) char **argv)
 {
     if(INITIALISED)
     {

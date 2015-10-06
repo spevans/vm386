@@ -58,7 +58,7 @@ struct kernel_module kernel_module =
 
     /* system variables passed by the startup code */
 
-    &cookie, root_dev
+    &cookie, root_dev, NULL, FALSE
 };
 
 /* All modules statically linked into the kernel (by ld) use this pointer

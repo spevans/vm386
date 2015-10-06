@@ -25,8 +25,10 @@ unimplemented(char *name, struct vm86_regs *regs)
     GET16(regs->eax), GET16(regs->ebx), GET16(regs->ecx), GET16(regs->edx));
 }
 
+
+// FIXME
 void
-vbios_ser_handler(struct vm *vm, struct vm86_regs *regs)
+vbios_ser_handler(__attribute__ ((unused)) struct vm *vm, struct vm86_regs *regs)
 {
     u_char func = GET8H(regs->eax);
     switch(func)

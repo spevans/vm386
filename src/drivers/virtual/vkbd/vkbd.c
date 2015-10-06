@@ -683,7 +683,8 @@ vkbd_switch_to(struct kbd *new, int shift_state)
 /* VBIOS stuff. */
 
 void
-vkbd_arpl_handler(struct vm *vm, struct vm86_regs *regs, u_short arpl)
+vkbd_arpl_handler(struct vm *vm, __attribute__ ((unused)) struct vm86_regs *regs,
+                  u_short arpl)
 {
     struct vkbd *vk = &vm->tty->kbd.virtual;
     DB(("vkbd_arpl_handler: vk=%p arpl=%x\n", vk, arpl));

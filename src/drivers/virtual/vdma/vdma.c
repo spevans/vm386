@@ -35,7 +35,8 @@ delete_vdma(struct vm *vm)
 }
 
 static bool
-create_vdma(struct vm *vmach, int argc, char **argv)
+create_vdma(struct vm *vmach, __attribute__ ((unused)) int argc,
+            __attribute__ ((unused)) char **argv)
 {
     struct vdma *new = kernel->calloc(sizeof(struct vdma), 1);
     if(new != NULL)
@@ -60,7 +61,7 @@ vdma_in(struct vm *vm, u_short port, int size)
     struct vdma *vdma = vm->slots[vm_slot];
     struct dma_ctrl *dma = NULL;
     if(vdma == NULL) return -1;
-
+    DB(("vdma_in: port = %u size = %d\n", port, size));
     /* isolate what it wants */
 
     if(port <= DMA0_HI) {
@@ -206,7 +207,8 @@ vdma_out(struct vm *vm, u_short port, int size, u_long val)
     struct vdma *vdma = vm->slots[vm_slot];
     struct dma_ctrl *dma = NULL;
     if(vdma == NULL) return;
-
+    DB(("vdma_out: port = %u size = %d\n", port, size));
+    
     /* isolate what it wants */
 
     if(port <= DMA0_HI) {

@@ -48,12 +48,16 @@ logged to the console as they occur."
 int
 cmd_dbio(struct shell *sh, int argc, char **argv)
 {
-    if(argc > 0)
-    {
-	if(!strcmp("-on", *argv))
+    if(argc != 1) {
+        sh->shell->printf(sh, "Error: missing option\n");
+    } else {
+        if(!strcmp("-on", *argv)) {
 	    verbose_io = TRUE;
-	else
-	    verbose_io = FALSE;
+        } else if(!strcmp("-off", *argv)) {
+            verbose_io = FALSE;
+        } else {
+            sh->shell->printf(sh, "Error: unknown option `%s'\n", *argv);
+        }
     }
     return 0;
 }

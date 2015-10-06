@@ -79,7 +79,7 @@ bmap_free(struct fs_device *dev, blkno bmap_start, u_long bit)
 /* Allocate a new block from DEV's bitmap. LOCALITY is where you want the
    new block to be close to. Note that LOCALITY is ignored for now... */
 blkno
-alloc_block(struct fs_device *dev, blkno locality)
+alloc_block(struct fs_device *dev, __attribute__ ((unused)) blkno locality)
 {
     blkno blk = bmap_alloc(dev, dev->sup.data_bitmap, dev->sup.data_size);
     return (blk == -1) ? 0 : dev->sup.data + blk;

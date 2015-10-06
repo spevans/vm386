@@ -24,6 +24,8 @@ static u_char set_dor(int drv, u_char mask, u_char data);
 /* set the dor to a value. Flirble */
 u_char set_dor(int drv, u_char mask, u_char data)
 {
+        // FIXME should probably make use of the drv to select drive
+        (void)drv;
 	register u_char old_dor, new_dor;
 
 	old_dor = current_dor;

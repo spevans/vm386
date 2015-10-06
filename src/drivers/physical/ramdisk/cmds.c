@@ -12,20 +12,25 @@
 
 extern list_t rd_dev_list;
 
-#define DOC_rdinfo "fdinfo\n\
+#define DOC_rdinfo "rdinfo [device]\n\
 Print information about the ramdisk driver."
 int
 cmd_rdinfo(struct shell *sh, int argc, char *argv[])
 {
     list_node_t *nxt, *x = rd_dev_list.head;
-    rd_dev_t *rd;
+    char *device = NULL;
 
+    if (argc == 1) {
+        device = argv[0];
+    }
     sh->shell->printf(sh, "Device	Ram Addr	Size\n");
     while((nxt = x->succ) != NULL)
     {
-        rd = (rd_dev_t *)x;
-        sh->shell->printf(sh, "%-6s %p	%u\n", rd->name, rd->ram,
-            rd->total_blocks);
+        rd_dev_t *rd = (rd_dev_t *)x;
+        if(device == NULL || !strcmp(device, rd->name)) {
+            sh->shell->printf(sh, "%-6s %p	%u\n", rd->name, rd->ram,
+                              rd->total_blocks);
+        }
         x = nxt;
     }
     return 0;

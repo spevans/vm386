@@ -68,7 +68,8 @@ mda_expunge(void)
 /* I/O port virtualisation. Basically this is just a write-through cache. */
 
 static inline void
-set_control_port(struct video *v, u_char ctl)
+set_control_port(__attribute__ ((unused)) struct video *v,
+                 __attribute__ ((unused)) u_char ctl)
 {
     /* Hmm. */
 }
@@ -222,7 +223,7 @@ mda_find_page(struct video *v, u_int page)
 }
 
 static bool
-mda_set_mode(struct video *v, u_int mode)
+mda_set_mode(__attribute__ ((unused)) struct video *v, u_int mode)
 {
     if(mode != 7)
 	return FALSE;

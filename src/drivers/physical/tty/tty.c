@@ -12,12 +12,14 @@
 #include <vmm/time.h>
 #include <stdarg.h>
 
+// Many functions take an unused struct tty so disable the warning
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+
 #define kprintf kernel->printf
 
 struct video_module *video;
 static struct kbd_module *kbd;
 static struct vkbd_module *vkbd;
-
 static list_t tty_list;
 
 static void tty_beep(struct tty *tty);
@@ -472,5 +474,5 @@ struct tty_module tty_module =
     tty_clear_chars, tty_set_cursor, tty_scroll_up, tty_read_cursor,
     tty_set_page,
     readline, tty_get_char,
-    tty_beep, speaker_on, speaker_off,
+    tty_beep, speaker_on, speaker_off, NULL
 };

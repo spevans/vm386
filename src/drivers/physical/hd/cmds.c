@@ -12,7 +12,8 @@
 #define DOC_hdinfo "hdinfo\n\
 Print information about the hard-disk driver."
 int
-cmd_hdinfo(struct shell *sh, int argc, char **argv)
+cmd_hdinfo(struct shell *sh, __attribute__((unused)) int argc,
+           __attribute__((unused)) char **argv)
 {
     hd_dev_t *dev;
     hd_partition_t *p;

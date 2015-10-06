@@ -46,7 +46,8 @@ delete_vbios(struct vm *vm)
 }
 
 static bool
-create_vbios(struct vm *vmach, int argc, char **argv)
+create_vbios(struct vm *vmach, __attribute__ ((unused)) int argc,
+             __attribute__ ((unused))char **argv)
 {
     struct vbios *new = kernel->calloc(sizeof(struct vbios), 1);
     if(new != NULL)
@@ -146,7 +147,7 @@ vbios_arpl_handler(struct vm *vm, struct vm86_regs *regs, u_short num)
 	break;
 
     case 0x13:			/* Disk functions. */
-	vbios_disk_handler(vm, regs, vm->slots[vm_slot]);
+	vbios_disk_handler(vm, regs);
 	break;
 
     case 0x14:			/* Serial comms. functions. */

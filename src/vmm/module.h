@@ -96,13 +96,16 @@ struct module {
          If this function is NULL the module will never be expunged. */
     bool	    (*expunge)(void);
 
-    bool	      is_static;	/* Module is statically allocated. */
+     /* Module is statically allocated. Set to FALSE by MODULE_INIT but set to
+        correct value (TRUE or FALSE) by kernel initialisation or module load. */
+    bool	      is_static;
 };
 
 /* Builds a module structure definition from its args (each arg initialises
    the structure field of the same name). */
 #define MODULE_INIT(name, version, init, open, close, expunge) \
-    { NULL, (name), (version), 0, NULL, 0, (init), (open), (close), (expunge) }
+        { NULL, (name), (version), 0, NULL, 0,                 \
+          (init), (open), (close), (expunge), FALSE }
 
 /* The current version number of all system modules. */
 #define SYS_VER 1

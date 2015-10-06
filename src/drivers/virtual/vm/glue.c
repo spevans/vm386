@@ -90,7 +90,7 @@ cmd_vminit(struct shell *sh, int argc, char **argv)
 Terminate the virtual machine initialisation section started by the most\n\
 recent vminit command, then start the machine running."
 int
-cmd_vmlaunch(struct shell *sh, int argc, char **argv)
+cmd_vmlaunch(struct shell *sh, __attribute__ ((unused)) int argc, __attribute__ ((unused)) char **argv)
 {
     struct init_vm *init = unlink_init_vm(sh);
     if(init != NULL)

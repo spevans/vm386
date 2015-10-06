@@ -22,9 +22,9 @@ cmd_x(struct shell *sh, int argc, char **argv)
     while(argc >= 1)
     {
 	u_long addr = kernel->strtoul(argv[0], NULL, 16);
-	kernel->printf("[%#010x] -> %#010x %#06x %#04x %c\n", addr,
-		       *(u_long *)addr, *(u_short *)addr, *(u_char *)addr,
-		       *(u_char *)addr);
+	shell->printf(sh, "[%#010x] -> %#010x %#06x %#04x %c\n", addr,
+                      *(u_long *)addr, *(u_short *)addr, *(u_char *)addr,
+                      *(u_char *)addr);
 	argc--; argv++;
     }
     return 0;
@@ -33,7 +33,7 @@ cmd_x(struct shell *sh, int argc, char **argv)
 #define DOC_poke "poke ADDR VALUE\n\
 Set the double-word at ADDR to VALUE."
 int
-cmd_poke(struct shell *sh, int argc, char **argv)
+cmd_poke(__attribute__ ((unused)) struct shell *sh, int argc, char **argv)
 {
     u_long *addr, val;
     if(argc < 2)

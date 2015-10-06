@@ -15,6 +15,8 @@
 #include <vmm/fs.h>
 #include <vmm/types.h>
 
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+
 extern void example_task(void);
 
 

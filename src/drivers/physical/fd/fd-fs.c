@@ -2,7 +2,9 @@
  * C.Luke
  */
 
+#define DEBUG
 #include "fd.h"
+
 
 extern struct fs_module *fs;
 
@@ -47,7 +49,7 @@ long floppy_write_block(void *fd, blkno block, void *buf, int count)
 
 long floppy_test_media(void *f)
 {
-#if 0
+#if 1
 	fd_dev_t *fd = (fd_dev_t *)f;
 	DB(("fd: testing media of: %s\n", fd->name));
 	return E_NODISK;
@@ -57,7 +59,7 @@ long floppy_test_media(void *f)
 #endif
 }
 
-long floppy_force_seek(fd_dev_t *fd, u_long cyl)
+long floppy_force_seek(__attribute__ ((unused)) fd_dev_t *fd, u_long cyl)
 {
 	blkreq_t req;
 	req.buf = NULL;
@@ -120,7 +122,7 @@ bool floppy_mkfs_partition(void)
 /* Timer.
  * Used to turn of floppy motors when idle, mostly.
  */
-void timer_intr(void *user_data)
+void timer_intr(__attribute__ ((unused)) void *user_data)
 {
 	if(int_timer_flag == FALSE)
 		return;

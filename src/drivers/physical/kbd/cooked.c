@@ -176,12 +176,14 @@ cooked_read_char(struct cooked_kbd *ck)
 }
 
 static void
-cooked_switch_from(struct kbd *kbd, int shift_state)
+cooked_switch_from(struct kbd *kbd, __attribute__((unused)) int shift_state)
 {
+    struct cooked_kbd *ck = (struct cooked_kbd *)kbd;
+    kbd_set_leds(ck->lock_state);
 }
 
 static void
-cooked_switch_to(struct kbd *kbd, int shift_state)
+cooked_switch_to(struct kbd *kbd, __attribute__((unused)) int shift_state)
 {
     struct cooked_kbd *ck = (struct cooked_kbd *)kbd;
     kbd_set_leds(ck->lock_state);

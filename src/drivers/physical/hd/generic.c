@@ -242,6 +242,7 @@ hd_add_dev(hd_dev_t *hd)
     return TRUE;
 }
 
+// FIXME
 /* Remove the hard-disk-like device DEV from the system. Returns TRUE if
    it succeeds, FALSE otherwise. */
 bool
@@ -249,6 +250,7 @@ hd_remove_dev(hd_dev_t *dev)
 {
     /* This needs some thought. A device can only be removed if no one
        is accessing it. */
+    (void)dev; // unused for now
     return FALSE;
 }
 

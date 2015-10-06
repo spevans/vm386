@@ -170,7 +170,8 @@ delete_vcmos(struct vm *vm)
 }
 
 static bool
-create_vcmos(struct vm *vmach, int argc, char **argv)
+create_vcmos(struct vm *vmach, __attribute__ ((unused)) int argc,
+             __attribute__ ((unused)) char **argv)
 {
     struct vcmos *new = kernel->calloc(sizeof(struct vcmos), 1);
     if(new != NULL)
@@ -304,7 +305,8 @@ DB(("Total Hard disks: %d\n", vmach->hardware.total_hdisks));
 /* Virtualisation Stuff */
 
 static u_long
-vcmos_in(struct vm *vm, u_short port, int size)
+vcmos_in(struct vm *vm, __attribute__ ((unused)) u_short port,
+         __attribute__ ((unused)) int size)
 {
     struct vcmos *v = vm->slots[vm_slot];
     if(v == NULL) return -1;
@@ -331,7 +333,8 @@ vcmos_in(struct vm *vm, u_short port, int size)
 }
 
 static void
-vcmos_out(struct vm *vm, u_short port, int size, u_long val)
+vcmos_out(struct vm *vm, u_short port, __attribute__ ((unused)) int size,
+          u_long val)
 {
     struct vcmos *v = vm->slots[vm_slot];
     if(v == NULL) return;
@@ -520,7 +523,7 @@ void set_alarm(struct vm *vm, struct vm86_regs *regs)
     CLC(regs);
 } 
 
-void reset_alarm(struct vm *vm, struct vm86_regs *regs)
+void reset_alarm(struct vm *vm, __attribute__ ((unused)) struct vm86_regs *regs)
 {
     struct vcmos *v = vm->slots[vm_slot];
     u_char *p;

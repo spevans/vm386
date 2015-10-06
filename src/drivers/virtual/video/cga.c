@@ -215,7 +215,7 @@ map_cga_buffer(struct video *v, bool phys_buf)
 
 /* Initialises V to virtualise a CGA device for the task TASK. */
 bool
-init_cga(struct video *v, u_long flags)
+init_cga(struct video *v, __attribute__ ((unused)) u_long flags)
 {
     int i;
     for(i = 0; i < 4; i++)

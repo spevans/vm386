@@ -2,6 +2,7 @@
 
    Simon Evans. */
 
+#define DEBUG
 #include <vmm/vfloppy.h>
 #include <vmm/kernel.h>
 #include <vmm/fs.h>
@@ -119,8 +120,8 @@ vfloppy_read_sectors(struct vm *vm, u_int drvno, u_int head, u_int track,
     u_long blkno;
     int i;
     if(flop == NULL) return 0;
-    DB(("vfd_read: buf=%p head=%d track=%d sector=%d count=%d\n",
-	buf, head, track, sector, count));
+    DB(("vfd_read: drvno=%u buf=%p head=%d track=%d sector=%d count=%d\n",
+	drvno, buf, head, track, sector, count));
     sector--;
     if(flop->got_disk == FALSE)
     {

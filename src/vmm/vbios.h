@@ -94,8 +94,7 @@ struct bios_data {
 extern void vbios_video_handler(struct vm *vm, struct vm86_regs *regs);
 
 /* from disk.c */
-extern void vbios_disk_handler(struct vm *vm, struct vm86_regs *regs,
-			       struct vbios *vbios);
+extern void vbios_disk_handler(struct vm *vm, struct vm86_regs *regs);
 
 /* from misc.c */
 extern void unimplemented(char *name, struct vm86_regs *regs);

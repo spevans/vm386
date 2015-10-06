@@ -76,7 +76,7 @@ get_fd_stat(struct vm *vm, struct vm86_regs *regs)
 }
 
 void
-vbios_disk_handler(struct vm *vm, struct vm86_regs *regs, struct vbios *vbios)
+vbios_disk_handler(struct vm *vm, struct vm86_regs *regs)
 {
     u_char func = GET8H(regs->eax);
     DB(("vbios_disk_handler: func=%x eax=%x edx=%x ecx=%x eflags=%x\n",

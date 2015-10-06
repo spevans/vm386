@@ -342,7 +342,8 @@ flush_device_cache(struct fs_device *dev, bool dont_write)
    error occurred on (from the buffer BH).
    ERRNO is the error type -- it will be put into the task's errno field. */
 static bool
-handle_device_error(struct buf_head *bh, int access_type, int errno)
+handle_device_error(struct buf_head *bh, __attribute__ ((unused)) int access_type,
+                    int errno)
 {
     ERRNO = errno;
     if(errno == E_NODISK)

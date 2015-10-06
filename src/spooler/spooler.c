@@ -175,7 +175,8 @@ cmd_lpr(struct shell *sh, int argc, char **argv)
 List the files in the spool queue."
 
 int
-cmd_lpq(struct shell *sh, int argc, char **argv)
+cmd_lpq(struct shell *sh, __attribute__ ((unused)) int argc,
+        __attribute__ ((unused)) char **argv)
 {
     list_node_t *nxt, *x = spool_list.head;
  

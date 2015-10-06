@@ -113,42 +113,37 @@ create_vprinter(struct vm *vmach, int argc, char **argv)
 
 
 
-void
+static void
 printer_write_char (struct vm *vm, struct vm86_regs *regs)
 {
+        DB(("printer_write_char vm = %p regs = %p", vm, regs));
 }
 
-void
+static void
 printer_initialise (struct vm *vm, struct vm86_regs *regs)
 {
+        DB(("printer_initialise vm = %p regs = %p", vm, regs));
 }
 
-void
+static void
 printer_get_status (struct vm *vm, struct vm86_regs *regs)
 {
+        DB(("printer_get_status vm = %p regs = %p", vm, regs));
 }
 
 
 u_short
 new_spool_file(struct vm *vm, u_short port)
 {
-#ifdef DEBUG
-  kprintf("new_spool_file on port: %d\n", port);
-#endif
-  return 1;
+        DB(("new_spool_file on vm = %p port: %d\n", vm, port));
+        return 1;
 }
 
-static void
-printer_initialise(struct vm *vm, struct vm86_regs *regs)
-{
-}
 
 u_short
 write_char(struct vm *vm, u_short port, u_short data)
 {
-#ifdef DEBUG
-  kprintf("write char %2x on port: %d\n", data, port);
-#endif
+        DB(("vprinter: write_char vm = %p port = %u data = %up", vm, port, data));
   return 1;
 }
 
@@ -156,14 +151,12 @@ write_char(struct vm *vm, u_short port, u_short data)
 u_short
 get_status(struct vm *vm, u_short port)
 {
-#ifdef DEBUG
-  kprintf("get_status on port: %d\n", port);
-#endif
+    DB(("vprinter: get_status vm = %p port = %p", vm, port));
   return 1;
 }
 
 static u_long
-vprinter_in(struct vm *vm, u_short port, int size)
+vprinter_in(struct vm *vm, u_short port, __attribute__ ((unused)) int size)
 {
     u_int offset;
     int i;
@@ -192,7 +185,7 @@ vprinter_in(struct vm *vm, u_short port, int size)
 }
 
 static void
-vprinter_out(struct vm *vm, u_short port, int size, u_long val)
+vprinter_out(struct vm *vm, u_short port, __attribute__ ((unused)) int size, u_long val)
 {
     u_int offset;
     int i;

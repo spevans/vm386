@@ -7,6 +7,9 @@
 #include <vmm/shell.h>
 #include <vmm/string.h>
 
+// Most of these commands are for testing so they ignore the parameters
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+
 extern struct shell_module *shell;
 
 #undef kprintf

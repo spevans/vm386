@@ -441,7 +441,8 @@ cmd_ucp(struct shell *sh, int argc, char **argv)
 #define DOC_bufstats "bufstats\n\
 Display some information about buffer-cache usage."
 int
-cmd_bufstats(struct shell *sh, int argc, char **argv)
+cmd_bufstats(struct shell *sh, __attribute__ ((unused)) int argc,
+                 __attribute__ ((unused)) char **argv)
 {
     SHELL->printf(sh, "  Total block accesses: %-8d\n"
 		  "       Cached accesses: %-8d\n"

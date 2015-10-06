@@ -3,6 +3,8 @@
 #include <vmm/kernel.h>
 #include <vmm/shell.h>
 
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+
 
 
 /* Commands stuff */

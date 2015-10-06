@@ -14,6 +14,8 @@ extern struct fs_module *fs;
 extern struct tty_module *tty;
 #endif
 
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+
 #define DOC_echo "echo ARGS...\n\
 Prints all its arguments separated by spaces, followed by a newline."
 int
