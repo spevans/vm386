@@ -8,7 +8,7 @@ int main(int argc, char *argv[])
 	FILE *fpin, *fpout;
 	struct exec header;
 	char *buf;
-	int i;
+	size_t i;
 
 	if(argc < 3) {
 		printf("usage: exe2bin infile outfile\n");

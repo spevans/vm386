@@ -97,9 +97,9 @@ dup_file(struct file *file)
    to the current position, or SEEK_EOF to move ARG bytes from the end of
    the file. Returns the new position or a negative error code. */
 long
-seek_file(struct file *file, long arg, int type)
+seek_file(struct file *file, u_long arg, int type)
 {
-    long new_pos;
+    u_long new_pos;
     if(file == NULL)
 	return -(ERRNO = E_BADARG);
     if(!test_media(file->inode->dev))
@@ -117,13 +117,17 @@ seek_file(struct file *file, long arg, int type)
 	break;
 
     case SEEK_EOF:
+        if (arg > file->inode->inode.size) {
+            // underflow
+            return -(ERRNO = E_BADARG);
+        }
 	new_pos = file->inode->inode.size - arg;
 	break;
 
     default:
 	return -(ERRNO = E_BADARG);
     }
-    if((new_pos < 0) || (new_pos > file->inode->inode.size))
+    if (new_pos > file->inode->inode.size)
 	return -(ERRNO = E_BADARG);
     else
 	return file->pos = new_pos;
@@ -249,7 +253,7 @@ delete_indirect_blocks(struct core_inode *inode, blkno blk, int depth)
 {
     struct buf_head *ind_blk = bread(inode->dev, blk);
     bool rc = TRUE;
-    int i;
+    size_t i;
     if(ind_blk == NULL)
 	return FALSE;
     if(inode->invalid)

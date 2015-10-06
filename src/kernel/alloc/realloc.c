@@ -13,7 +13,13 @@
 #include <vmm/string.h>
 #include <vmm/tasks.h>
 
-#define MIN(A, B) ((A) < (B) ? (A) : (B))
+
+static size_t
+min_size(size_t a, size_t b)
+{
+    return a < b ? a : b;
+}
+
 
 /* Resize the given region to the new size, returning a pointer
    to the (possibly moved) region.  This is optimized for speed;
@@ -24,7 +30,8 @@ void *
 realloc(void *ptr, size_t size)
 {
     void *result, *previous;
-    int block, blocks, type;
+    unsigned int type;
+    int block, blocks;
     int oldlimit;
 
     if (!ptr)
@@ -102,7 +109,7 @@ realloc(void *ptr, size_t size)
     default:
 	/* Old size is a fragment; type is logarithm to base two of
 	   the fragment size. */
-	if ((size > 1 << (type - 1)) && (size <= 1 << type)) {
+	if ((size > 1u << (type - 1)) && (size <= 1u << type)) {
 	    /* New size is the same kind of fragment. */
 	    permit();
 	    return ptr;
@@ -111,7 +118,7 @@ realloc(void *ptr, size_t size)
 	       the lesser of the new size and the old. */
 	    result = malloc(size);
 	    if (result) {
-		memcpy(result, ptr, MIN(size, 1 << type));
+		memcpy(result, ptr, min_size(size, 1 << type));
 		free(ptr);
 	    }
 	    permit();

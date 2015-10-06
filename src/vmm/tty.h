@@ -28,7 +28,7 @@ struct tty {
     struct kbd *base_kbd;
     struct video video;
     u_char current_page;
-    short x, y;
+    u_short x, y;
     list_t rl_history;			/* For readline() */
     int rl_history_size;
 };
@@ -61,7 +61,7 @@ struct tty_module {
     void (*vprintf)(struct tty *tty, const char *fmt, va_list args);
     void (*clear)(struct tty *tty);
     void (*clear_chars)(struct tty *tty, size_t length);
-    void (*set_cursor)(struct tty *tty, short x, short y);
+    void (*set_cursor)(struct tty *tty, u_short x, u_short y);
     void (*scroll_up)(struct tty *tty);
     void (*read_cursor)(struct tty *tty);
     void (*set_page)(struct tty *tty, u_int pageno);

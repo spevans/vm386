@@ -42,7 +42,7 @@ tty_scroll_up(struct tty *tty)
 
 /* Set the cursor of TTY to position (X,Y) */
 static void
-tty_set_cursor(struct tty *tty, short x, short y)
+tty_set_cursor(struct tty *tty, u_short x, u_short y)
 {
     u_short offset;
     if((x > TTY_COLS(tty)) || (y > TTY_ROWS(tty)))

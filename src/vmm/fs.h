@@ -27,6 +27,9 @@
 typedef u_long blkno;
 typedef u_char blk[FS_BLKSIZ];
 
+/* Returned from functions that allocate blocks if none are free */
+#define NO_FREE_BLOCK 0xffffffff
+
 /* The layout of a file system is something like:
 
 	+------------------+
@@ -256,7 +259,7 @@ struct fs_module {
     void (*close)(struct file *f);
     long (*read)(void *buf, size_t len, struct file *f);
     long (*write)(const void *buf, size_t len, struct file *f);
-    long (*seek)(struct file *f, long arg, int type);
+    long (*seek)(struct file *f, u_long arg, int type);
     struct file *(*dup)(struct file *f);
     bool (*truncate)(struct file *f);
     bool (*set_file_size)(struct file *f, size_t size);
@@ -314,7 +317,7 @@ extern void invalidate_device(struct fs_device *dev);
 extern bool validate_device(struct fs_device *dev);
 
 /* from bitmap.c */
-extern long bmap_alloc(struct fs_device *dev, blkno bmap_start, u_long bmap_len);
+extern blkno bmap_alloc(struct fs_device *dev, blkno bmap_start, u_long bmap_len);
 extern bool bmap_free(struct fs_device *dev, blkno bmap_start, u_long bit);
 extern blkno alloc_block(struct fs_device *dev, blkno locality);
 extern bool free_block(struct fs_device *dev, blkno blk);
@@ -348,7 +351,7 @@ extern void kill_files(void);
 extern struct file *make_file(struct core_inode *inode);
 extern void close_file(struct file *file);
 extern struct file *dup_file(struct file *file);
-extern long seek_file(struct file *file, long arg, int type);
+extern long seek_file(struct file *file, u_long arg, int type);
 extern long read_file(void *buf, size_t len, struct file *file);
 extern long write_file(const void *buf, size_t len, struct file *file);
 extern bool delete_inode_data(struct core_inode *inode);

@@ -159,7 +159,8 @@ static u_long
 vprinter_in(struct vm *vm, u_short port, __attribute__ ((unused)) int size)
 {
     u_int offset;
-    int i;
+    size_t i;
+
     struct vprinter *v = vm->slots[vm_slot];
     if(v == NULL) return -1;
 #ifdef DEBUG
@@ -188,7 +189,8 @@ static void
 vprinter_out(struct vm *vm, u_short port, __attribute__ ((unused)) int size, u_long val)
 {
     u_int offset;
-    int i;
+    size_t i;
+
     struct vprinter *v = vm->slots[vm_slot];
     if(v == NULL) return;
 #ifdef DEBUG

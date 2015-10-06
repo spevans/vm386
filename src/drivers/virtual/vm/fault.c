@@ -456,7 +456,7 @@ vm_gpe_handler(struct trap_regs *regs)
 		count &= (prefixes & PFX_ADDR) ? 0xffffffff : 0x0000ffff;
 		while(count-- != 0)
 		{
-		    u_long val = ioh ? ioh->in(vm, port, size) : ~0;
+		    u_long val = ioh ? ioh->in(vm, port, size) : 0xffffffff;
 		    switch(size)
 		    {
 		    case 1:

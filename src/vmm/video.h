@@ -17,7 +17,7 @@ struct video_ops;
 #include <vmm/cga.h>
 
 struct mode_info {
-    short cols, rows;
+    u_long cols, rows;
     u_char *buffer;			/* In USER space. */
     size_t page_size;
     u_char pages;

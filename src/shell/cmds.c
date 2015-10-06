@@ -143,7 +143,7 @@ cmd_ed(struct shell *sh, int argc, char **argv)
 	size_t length;
 	while((str = tty->readline(sh->tty, &length)) != NULL)
 	{
-	    if(fs->write(str, length, fh) != length)
+	    if(fs->write(str, length, fh) != (long)length)
 	    {
 		shell_perror(sh, argv[0]);
 		kernel->free(str);

@@ -312,7 +312,7 @@ leap_year(int yr)
 void
 expand_time(time32_t cal, struct time_bits *tm)
 {
-    int month, year, nxt;
+    int month, year;
     DB(("expand_time: cal=%Z tm=%p\n", cal, tm));
     tm->second = cal % SECS_PER_MIN;
     cal /= SECS_PER_MIN;
@@ -327,7 +327,7 @@ expand_time(time32_t cal, struct time_bits *tm)
     year = EPOCH_YEAR;
     while(1)
     {
-	nxt = leap_year(year) ? DAYS_PER_LEAP_YEAR : DAYS_PER_YEAR;
+	time32_t nxt = leap_year(year) ? DAYS_PER_LEAP_YEAR : DAYS_PER_YEAR;
 	if(cal < nxt)
 	    break;
 	cal -= nxt;
@@ -338,7 +338,7 @@ expand_time(time32_t cal, struct time_bits *tm)
     month = 0;
     while(1)
     {
-	nxt = days_per_month[leap_year(year)][month];
+	time32_t nxt = days_per_month[leap_year(year)][month];
 	if(cal < nxt)
 	    break;
 	cal -= nxt;

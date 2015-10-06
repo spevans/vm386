@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <vmm/fs.h>
 #include <string.h>
-#include "../fs/bootsect.h"
+
 #define	BOOT_PARAMS	453
 
 #define BYTE_BOOT_PARAM(x)	*((unsigned char *)(&bpb.boot_code[BOOT_PARAMS+x]))

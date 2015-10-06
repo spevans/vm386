@@ -41,7 +41,7 @@ extern void *_default_morecore(long);
 /* Data structure giving per-block information. */
 union info {
     struct {
-	int type;		/* Zero for a large block, or positive
+	unsigned int type;	/* Zero for a large block, or positive
 				   giving the logarithm to the base two
 				   of the fragment size. */
 	union {

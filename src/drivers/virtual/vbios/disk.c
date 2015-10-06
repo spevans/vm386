@@ -199,7 +199,7 @@ vbios_disk_handler(struct vm *vm, struct vm86_regs *regs)
 					       + GET16(regs->ebx));
 		    if(vide->get_geom(vm, &heads, &cyls, &sects))
 		    {
-			int i;
+			u_short i;
 			for(i = 0; i < sects; i++)
 			    put_user_short(i, &buf[i]);
 		    }

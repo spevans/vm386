@@ -166,10 +166,10 @@ rl_insert(struct rl_info *rl, char *str, size_t len)
 
 /* Delete EXTENT characters from the line RL at position START-POS. */
 static bool
-rl_delete(struct rl_info *rl, u_long start_pos, long extent)
+rl_delete(struct rl_info *rl, long start_pos, long extent)
 {
     u_long x, y;
-    if(start_pos > rl->line_len)
+    if(start_pos > (long)rl->line_len)
     {
 	extent -= (rl->line_len - start_pos);
 	if(extent <= 0)
@@ -390,7 +390,7 @@ rl_forward_char(struct rl_info *rl, int count)
 	rl->cursor_pos = 0;
 	tty_module.beep(rl->tty);
     }
-    else if(rl->cursor_pos > rl->line_len)
+    else if(rl->cursor_pos > (long)rl->line_len)
     {
 	rl->cursor_pos = rl->line_len;
 	tty_module.beep(rl->tty);
@@ -574,7 +574,7 @@ readline(struct tty *tty, size_t *lengthp)
 		break;
 
 	    case '\x04': //'':
-		if(rl.cursor_pos == rl.line_len)
+		if(rl.cursor_pos == (long)rl.line_len)
 		{
 		    if(rl.cursor_pos == 0)
 			no_output = TRUE;

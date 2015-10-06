@@ -116,7 +116,8 @@ void *
 malloc(size_t size)
 {
     void *result;
-    int log, block, blocks, i, lastblocks, start;
+    unsigned int log;
+    int block, blocks, i, lastblocks, start;
     struct list *next;
 
     forbid();

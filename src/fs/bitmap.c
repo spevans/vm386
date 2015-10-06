@@ -18,8 +18,8 @@
 
 /* Find a free entity in the bitmap starting at block BMAP-START on device
    DEV which contains BMAP-LEN bits. Sets the free bit it finds then returns
-   the bit number, or -1 if an error or all bits are set. */
-long
+   the bit number, or NO_FREE_BLOCK if an error or all bits are set. */
+blkno
 bmap_alloc(struct fs_device *dev, blkno bmap_start, u_long bmap_len)
 {
     blkno bmap_blk = bmap_start;
@@ -46,7 +46,7 @@ bmap_alloc(struct fs_device *dev, blkno bmap_start, u_long bmap_len)
 	bmap_blk++;
     }
     ERRNO = E_NOSPC;
-    return -1;
+    return NO_FREE_BLOCK;
 }
 
 /* Mark the entity at bit number BIT of the bitmap starting at block
@@ -82,7 +82,7 @@ blkno
 alloc_block(struct fs_device *dev, __attribute__ ((unused)) blkno locality)
 {
     blkno blk = bmap_alloc(dev, dev->sup.data_bitmap, dev->sup.data_size);
-    return (blk == -1) ? 0 : dev->sup.data + blk;
+    return (blk == NO_FREE_BLOCK) ? 0 : dev->sup.data + blk;
 }
 
 /* Deallocate the block BLK from DEV. */

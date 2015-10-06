@@ -174,7 +174,7 @@ fill_vm_page_dir(struct vm *vm)
 			PTE_USER | PTE_PRESENT);
 	x += PAGE_SIZE / 1024;
     }
-    while(x < (1024 + vm->hardware.extended_mem))
+    while(x < (1024u + vm->hardware.extended_mem))
     {
 	kernel->set_pte(pd, x * 1024,
 			PTE_USER | PTE_READ_WRITE | PTE_FREEABLE);

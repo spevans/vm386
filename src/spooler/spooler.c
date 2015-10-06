@@ -73,7 +73,7 @@ add_spool_file(char *fname)
 
 
 bool
-remove_spool_file(int job)
+remove_spool_file(unsigned int job)
 {
     list_node_t *nxt, *x = spool_list.head;
     struct spool_entry *entry;
@@ -203,13 +203,12 @@ Remove the specified jobs from the spool queue."
 int 
 cmd_lprm(struct shell *sh, int argc, char **argv)
 {
-   int j;
    while(argc--) {
-       j = (int)kernel->strtoul(*argv, NULL, 10);
-       if(remove_spool_file(j)) {
-           sh->shell->printf(sh, "Removed job# %d\n", j);
+       unsigned int job = kernel->strtoul(*argv, NULL, 10);
+       if(remove_spool_file(job)) {
+           sh->shell->printf(sh, "Removed job# %d\n", job);
        } else {
-           sh->shell->printf(sh, "Failed to remove job# %d\n", j);
+           sh->shell->printf(sh, "Failed to remove job# %d\n", job);
        }
        argv++;
    }

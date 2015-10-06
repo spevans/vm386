@@ -27,7 +27,7 @@ bios_scroll_up_one(struct tty *vmtty, short page)
 
 static void
 bios_print(struct tty *vmtty, u_char *str, bool in_user, size_t length,
-	   u_char type, u_char def_attr, short col, short row, short page)
+	   u_char type, u_char def_attr, u_short col, u_short row, short page)
 {
 #define UPDATE_POINT \
     point = (TTY_BUF(vmtty) + (page * TTY_PAGE_SIZE(vmtty)) \
@@ -45,16 +45,17 @@ bios_print(struct tty *vmtty, u_char *str, bool in_user, size_t length,
 	switch(c)
 	{
 	case 0x08: /* BS */
-	    if(--col < 0)
-	    {
-		if(--row < 0)
-		{
-		    row = 0;
-		    col = 0;
-		}
-		else
-		    col = TTY_COLS(vmtty) - 1;
-	    }
+            if (col > 0) {
+                col--;
+            } else {
+                if (row > 0) {
+                    col = TTY_COLS(vmtty) - 1;
+                    row--;
+                } else {
+                    row = 0;
+                    col = 0;
+                }
+            }
 	    UPDATE_POINT;
 	    break;
 	case 0x0d: /* CR */

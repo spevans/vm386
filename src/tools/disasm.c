@@ -16,6 +16,7 @@
 #include <assert.h>
 #include <stdarg.h>
 #include <stdlib.h>
+#include <limits.h>
 
 #define	MAXUBUF		100		/* Size of internal output buffer */
 
@@ -426,7 +427,7 @@ unsigned int hex_to_int(char *s)
 
 int main(int argc, char **argv)
 {
-	unsigned int start = 0, end = -1, address = 0; 
+	unsigned int start = 0, end = UINT_MAX, address = 0;
 	unsigned int len, filelen;
 	FILE *fp;
 	unsigned char *buf;
@@ -480,7 +481,7 @@ int main(int argc, char **argv)
 	rewind(fp);
 
 	fseek(fp, (long)start, 0);
-	if(end == -1) 
+	if(end == UINT_MAX)
 		end = filelen;
 	len = (end - start) + 16;
 	if(len > filelen) len = filelen;

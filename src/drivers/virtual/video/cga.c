@@ -200,7 +200,7 @@ cga_outb(struct video *v, u_char byte, u_short port)
 static inline void
 map_cga_buffer(struct video *v, bool phys_buf)
 {
-    int i;
+    size_t i;
     DB(("map_cga_buffer: v=%p phys_buf=%#d\n", v, phys_buf));
     forbid();
     for(i = 0; i < 4; i++)

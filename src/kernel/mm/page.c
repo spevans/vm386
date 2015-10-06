@@ -60,7 +60,7 @@ alloc_pages_64(u_long n)
 	    /* Found a page starting on a 64k boundary.
 	       Now see if the other pages after it are free. */
 	    page *top = x + n, *y = page_free_list;
-	    int found = 1;
+	    u_long found = 1;
 	    while(y != NULL)
 	    {
 		if((y > x) && (y < top))

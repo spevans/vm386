@@ -38,7 +38,7 @@ find_file_entry(struct file *dir, const char *name)
     seek_file(dir, 0, SEEK_ABS);
     while(dir_len > 0)
     {
-	int i;
+	size_t i;
 	tmp = read_file(&tmp_dir_blk, max(dir_len, FS_BLKSIZ), dir);
 	if(tmp < 0)
 	    return NULL;
@@ -75,7 +75,7 @@ create_file_entry(struct file *dir, const char *name, long inum)
     seek_file(dir, 0, SEEK_ABS);
     while(dir_len > 0)
     {
-	int i;
+	size_t i;
 	tmp = read_file(&tmp_dir_blk, max(dir_len, FS_BLKSIZ), dir);
 	if(tmp < 0)
 	    return tmp;
@@ -119,7 +119,7 @@ delete_file_entry(struct file *dir, const char *name)
     seek_file(dir, 0, SEEK_ABS);
     while(dir_len > 0)
     {
-	int i;
+	size_t i;
 	tmp = read_file(&tmp_dir_blk, max(dir_len, FS_BLKSIZ), dir);
 	if(tmp < 0)
 	    return tmp;
@@ -254,7 +254,7 @@ directory_empty_p(struct file *dir)
     seek_file(dir, 0, SEEK_ABS);
     while(dir_len > 0)
     {
-	int i;
+	size_t i;
 	tmp = read_file(&tmp_dir_blk, max(dir_len, FS_BLKSIZ), dir);
 	if(tmp < 0)
 	    return FALSE;

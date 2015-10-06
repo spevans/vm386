@@ -352,7 +352,7 @@ int cmd_strsrch(struct shell *sh, int argc, char **argv)
 	static char *start = NULL, *str = NULL;
 	static u_int count = 0x80;
 	char *p, f;
-	u_int i, j;
+	int i, j;
 	u_long old_cr3 = 0;
 	bool in_user = FALSE, all_chk = FALSE;
 
@@ -446,7 +446,7 @@ int cmd_strsrch(struct shell *sh, int argc, char **argv)
 	j = strlen(str);
 	p = kernel->malloc(j+1);
 	f = 0;
-	for(i=0; i<count; i++, start++)
+	for(i=0; i< (int)count; i++, start++)
 	if(!all_chk || (all_chk && kernel->check_area(
 		TO_LOGICAL(kernel->current_task->tss.cr3, page_dir *),
 		in_user ? (u_long)start : TO_LINEAR(start), count)))
