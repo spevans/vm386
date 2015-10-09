@@ -109,7 +109,7 @@ add_initial_task()
 
 
 static int
-create_tss(struct task *task, void *code)
+create_tss(struct task *task, void (*code)(void))
 {
     task->stack0 = alloc_page();
     if(task->stack0 != NULL)
@@ -147,7 +147,7 @@ create_tss(struct task *task, void *code)
 }
 
 struct task *
-add_task(void *task, u_long flags, short pri, const char *name)
+add_task(void (*task)(void), u_long flags, short pri, const char *name)
 {
     struct task *new_task;
     if(TaskCount != MAX_TASKS)
@@ -291,7 +291,7 @@ describe_tasks(struct shell *sh)
 	{
 	    sh->shell->printf(sh,
 			      "%-16s %5u %5u %04X %08X % 04d %8u %8u % 03d\n",
-			      TaskArray[i].name ? : "",
+			      (TaskArray[i].name != NULL) ? TaskArray[i].name : "",
 			      TaskArray[i].pid,
 			      TaskArray[i].ppid,
 			      TaskArray[i].tss_sel,

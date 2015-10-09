@@ -60,7 +60,7 @@ struct kernel_module
     void (*wake_task)(struct task *task);
     void (*suspend_task)(struct task *task);
     void (*suspend_current_task)(void);
-    struct task *(*add_task)(void *task, u_long flags, short pri,
+    struct task *(*add_task)(void (*task)(void), u_long flags, short pri,
 			     const char *name);
     int (*kill_task)(struct task *task);
     struct task *(*find_task_by_pid)(u_long pid);
@@ -72,7 +72,7 @@ struct kernel_module
     void (*wake_up_first_task)(struct task_list **head);
     
     /* IRQ functions. */
-    bool (*alloc_irq)(u_int irq, void *func, char *name);
+    bool (*alloc_irq)(u_int irq, void (*func)(void), char *name);
     void (*dealloc_irq)(u_int irq);
     bool (*alloc_queued_irq)(u_int irq, void (*func)(void), char *name);
     void (*dealloc_queued_irq)(u_int irq);
@@ -152,8 +152,8 @@ extern bool add_kernel_cmds(void);
 #define printk kprintf
 
 /* misc.. */
-extern void set_intr_gate(int, void *);
-extern void set_trap_gate(int, void *);
+extern void set_intr_gate(int, void (*handler)(void));
+extern void set_trap_gate(int, void (*handler)(void));
 extern u_long kernel_page_dir;
 extern unsigned int *PhysicalMem;
 extern u_long logical_top_of_kernel;

@@ -14,7 +14,7 @@ MLD := $(TOPDIR)/kernel/modules/mld-elf
 MSTRIP := $(STRIP)
 MSTRIPFLAGS := --remove-section=.comment --remove-section=.eh_frame -g
 
-CFLAGS := -O2 -Wall -Wstrict-prototypes $(VMM_CFLAGS) -fno-strict-aliasing -fno-builtin -m32 -march=i386 -Werror -Wall -Wextra -Wno-attributes
+CFLAGS := -O2 -std=gnu99 -Wall -Wstrict-prototypes $(VMM_CFLAGS) -fno-strict-aliasing -fno-builtin -m32 -march=i386 -Werror -Wall -Wextra -Wno-attributes
 
 ifndef TEST
 CFLAGS += -fomit-frame-pointer

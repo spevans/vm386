@@ -12,14 +12,21 @@
 #define _MC146818RTC_H
 #include <vmm/io.h>
 
-#define CMOS_READ(addr) ({ \
-outb_p(addr|0x80,0x70); \
-inb_p(0x71); \
-})
-#define CMOS_WRITE(val, addr) ({ \
-outb_p(addr|0x80,0x70); \
-outb_p(val,0x71); \
-})
+
+static inline u_char
+CMOS_READ(u_short addr)
+{
+    outb_p(addr|0x80,0x70);
+    return inb_p(0x71);
+}
+
+
+static inline void
+CMOS_WRITE(u_char val, u_short addr)
+{
+    outb_p(addr|0x80,0x70);
+    outb_p(val,0x71);
+}
 
 /**********************************************************************
  * register summary

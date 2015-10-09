@@ -7,7 +7,7 @@
 #include <vmm/tasks.h>
 #include <vmm/shell.h>
 
-void *Irq_handlers[16];
+void (*Irq_handlers[16])(void);
 char *Irq_names[16];
 
 static void set_idt_entry(int entry, unsigned int addr, int type)
@@ -17,18 +17,18 @@ static void set_idt_entry(int entry, unsigned int addr, int type)
 }
 
 
-void set_intr_gate(int entry, void *addr)
+void set_intr_gate(int entry, void (*addr)(void))
 {
 	set_idt_entry(entry, (u_long)addr, 14);
 }
 
 
-void set_trap_gate(int entry, void *addr)
+void set_trap_gate(int entry, void (*addr)(void))
 {
 	set_idt_entry(entry, (u_long)addr, 15);
 }
 
-bool alloc_irq(u_int irq, void *func, char *name)
+bool alloc_irq(u_int irq, void (*func)(void), char *name)
 {
 	u_long flags;
 	if(irq > 15) return FALSE;

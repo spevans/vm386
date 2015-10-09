@@ -3,7 +3,7 @@
 
 #include <vmm/types.h>
 
-bool alloc_irq(u_int, void *, char *);
+bool alloc_irq(u_int, void (*func)(void), char *);
 void dealloc_irq(u_int);
 void init_irq_handlers(void);
 

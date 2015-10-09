@@ -67,7 +67,7 @@ struct kernel_module *kernel;
 
 struct fs_module *fs;
 
-extern int main(int argc, char *argv[]);
+extern void *start_of_kernel;
 
 void
 kernel_mod_init(void)
@@ -77,7 +77,7 @@ kernel_mod_init(void)
        kernel). */
     kernel = &kernel_module;
     kernel_module.base.is_static = TRUE;
-    kernel_module.base.mod_start = &main;
+    kernel_module.base.mod_start = start_of_kernel;
     kernel_module.base.mod_size = ((u_long)logical_top_of_kernel
 				   - (u_long)kernel_module.base.mod_start);
     add_module(&kernel_module.base);

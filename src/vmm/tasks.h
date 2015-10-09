@@ -119,7 +119,7 @@ extern void init_sched(void);
 
 /* from task.c */
 extern int add_initial_task(void);
-extern struct task *add_task(void *task, u_long flags, short pri,
+extern struct task *add_task(void (*task)(void), u_long flags, short pri,
 			     const char *name);
 extern void reclaim_task(struct task *task);
 extern int kill_task(struct task *task);
