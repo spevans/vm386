@@ -15,6 +15,9 @@
 #define HD_SECTOR	0x1f3		/* starting sector */
 #define HD_LCYL		0x1f4		/* starting cylinder */
 #define HD_HCYL		0x1f5		/* high byte */
+#define HD_LBA0         HD_SECTOR       /* Byte 0 of LBA */
+#define HD_LBA1         HD_LCYL         /* Byte 1 of LBA */
+#define HD_LBA2         HD_HCYL         /* Byte 2 of LBA */
 #define HD_CURRENT	0x1f6		/* 101dhhhh, d=drive, hhhh=head */
 #define HD_STATUS	0x1f7		/* Get status, reset INTRQ. */
 #define HD_COMMAND	HD_STATUS	/* Invoke command. */
@@ -60,6 +63,7 @@
 #define HD_CMD_SEEK		0x70	/* Seek. */
 #define HD_CMD_DIAGNOSE		0x90	/* Execute drive diagnostic. */
 #define HD_CMD_SPECIFY		0x91	/* Initialise drive parameters. */
+#define HD_CMD_IDENTIFY_PACKET  0xA1    /* Identify packet. */
 #define HD_CMD_SETIDLE1		0xE3	/* First byte of Idle. */
 #define HD_CMD_SETIDLE2		0x97	/* Second byte of Idle. */
 #define HD_CMD_READMULT		0xC4	/* Read multiple. */
@@ -67,5 +71,17 @@
 #define HD_CMD_SETMULT		0xC6	/* Set multiple mode. */
 #define HD_CMD_IDENTIFY		0xEC	/* Identify drive. */
 #define HD_CMD_SETFEATURES	0xEF	/* Set features. */
+
+#define ATA_IDENT_DEVICETYPE   0
+#define ATA_IDENT_CYLINDERS    2
+#define ATA_IDENT_HEADS        6
+#define ATA_IDENT_SECTORS      12
+#define ATA_IDENT_SERIAL       20
+#define ATA_IDENT_MODEL        54
+#define ATA_IDENT_CAPABILITIES 98
+#define ATA_IDENT_FIELDVALID   106
+#define ATA_IDENT_MAX_LBA      120
+#define ATA_IDENT_COMMANDSETS  164
+#define ATA_IDENT_MAX_LBA_EXT  200
 
 #endif /* _VMM_HDREG_H */

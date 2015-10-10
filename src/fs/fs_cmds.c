@@ -470,9 +470,10 @@ cmd_mount(struct shell *sh, int argc, char **argv)
 		    SHELL->printf(sh, "Error: no partition `%s'\n",
 				  argv[1]);
 		    rc = RC_FAIL;
-		}
-		if(!hd->mount_partition(p, FALSE))
-		    rc = RC_FAIL;
+		} else {
+                    if(!hd->mount_partition(p, FALSE))
+                        rc = RC_FAIL;
+                }
 		kernel->close_module((struct module *)hd);
 	    }
 	    else

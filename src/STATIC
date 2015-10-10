@@ -7,3 +7,4 @@ drivers/virtual/vm/vm
 drivers/virtual/video/video
 drivers/physical/tty/tty
 shell/shell
+drivers/physical/hd/hd
