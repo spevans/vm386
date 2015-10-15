@@ -26,7 +26,6 @@ epilog();
 sub prolog {
 print <<EOF
 OUTPUT(modules.o)
-FORCE_COMMON_ALLOCATION
 
 
 SECTIONS
@@ -51,7 +50,7 @@ print <<EOF
   }
 
   .bss : {
-    *(.bss) *(COMMON)
+    *(.bss)
   }
 }
 EOF

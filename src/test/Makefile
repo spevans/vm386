@@ -1,4 +1,4 @@
-SRCS = test_mod.c test.c
+SRCS = test_mod.c # test.c
 OBJS = $(SRCS:.c=.o)
 
 all : test.module

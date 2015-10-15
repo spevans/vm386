@@ -34,6 +34,8 @@ add_test_cmds(void)
 
 bool test_init(void)
 {
+    kernel->printf("test_init(): test_start=%p test_module=%p test_end=%p kernel=%p\n",
+                   test_start, test_module, test_end, kernel);
     add_test_cmds();
     return TRUE;
 }
