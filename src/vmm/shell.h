@@ -60,9 +60,10 @@ struct shell_module {
 
 /* From shell.c */
 extern struct shell_module shell_module;
-extern struct shell sys_shell;
+struct shell;
+struct fs_module;
+struct tty_module;
 #ifndef TEST_SHELL
-extern struct tty_module *tty;
 #endif
 extern void init_shell_struct(struct shell *sh);
 extern bool shell_init(void);
@@ -97,7 +98,7 @@ extern int cmd_echo(struct shell *sh, int, char **);
 extern int cmd_prompt(struct shell *sh, int, char **);
 extern int cmd_help(struct shell *sh, int, char **);
 extern int cmd_quit(struct shell *sh, int, char **);
-extern bool init_cmds(void);
+extern bool init_cmds(struct fs_module *fs, struct tty_module *tty);
 
 #endif /* SHELL_MODULE */
 

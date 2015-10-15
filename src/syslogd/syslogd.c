@@ -13,7 +13,7 @@
 
 static bool do_logging;
 static struct file *LogFp;
-struct fs_module *fs;
+static struct fs_module *fs;
 static struct task *syslogd;
 static struct semaphore new_data;
 

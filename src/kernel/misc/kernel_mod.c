@@ -47,7 +47,7 @@ struct kernel_module kernel_module =
     /* misc functions */
     kvsprintf, ksprintf, kvprintf, kprintf, set_kprint_func,
     get_gdt, set_debug_reg, error_string, dump_regs,
-    strtoul, strdup,
+    strtoul, strdup, get_fs_module,
 
     /* Time functions. */
     add_timer, remove_timer, sleep_for_ticks, sleep_for,
@@ -65,7 +65,7 @@ struct kernel_module kernel_module =
    to reference the kernel module. */
 struct kernel_module *kernel;
 
-struct fs_module *fs;
+static struct fs_module *fs;
 
 extern void *start_of_kernel;
 
@@ -106,4 +106,13 @@ kernel_mod_init2(void)
     close_module(shell);
 #endif
     collect_shell_cmds();
+}
+
+
+/* Allow other parts of the kernel module and other modules to access the `fs'
+   module which has to be statically linked in anyway */
+struct fs_module *
+get_fs_module(void)
+{
+    return fs;
 }

@@ -3,7 +3,6 @@
 #include <vmm/kernel.h>
 #include <vmm/spooler.h>
 
-struct kernel_module *kernel;
 
 struct spooler_module spooler_module =
 {

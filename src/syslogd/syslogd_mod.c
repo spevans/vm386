@@ -5,7 +5,6 @@
 #include <vmm/syslogd.h>
 #include <vmm/kernel.h>
 
-struct kernel_module *kernel;
 
 struct syslogd_module syslogd_module =
 {

@@ -94,6 +94,7 @@ struct kernel_module
     void (*dump_regs)(struct trap_regs *regs, bool stop);
     u_long (*strtoul)(const char *str, char **ptr, int base);
     char * (*strdup)(const char *str);
+    struct fs_module * (*get_fs_module)(void);
 
     /* Time handling. */
     void (*add_timer)(struct timer_req *req);
@@ -131,9 +132,9 @@ extern struct kernel_module *kernel; /* Defined separately in *each* module */
 
 /* from kernel_mod.c */
 extern struct kernel_module kernel_module;
-extern struct fs_module *fs;
 extern void kernel_mod_init(void);
 extern void kernel_mod_init2(void);
+extern struct fs_module *get_fs_module(void);
 
 /* from printf.c */
 extern void kvsprintf(char *buf, const char *fmt, va_list args);
@@ -146,7 +147,6 @@ extern void set_kprint_func(void (*func)(const char *, size_t));
 extern void add_shell_cmds(struct shell_cmds *cmds);
 extern void remove_shell_cmds(struct shell_cmds *cmds);
 extern void collect_shell_cmds(void);
-
 extern bool add_kernel_cmds(void);
 
 #define printk kprintf

@@ -170,6 +170,7 @@ add_task(void (*task)(void), u_long flags, short pri, const char *name)
 		    new_task->errno = 0;
 		    if(current_task->current_dir)
 		    {
+                        struct fs_module *fs = kernel->get_fs_module();
 			new_task->current_dir = fs->dup(current_task->current_dir);
 		    }
 		    else
@@ -226,9 +227,10 @@ kill_task(struct task *task)
 
     if(task->flags & TASK_IMMORTAL)
 	return -1;
-    if(task->current_dir != NULL)
+    if(task->current_dir != NULL) {
+        struct fs_module *fs = kernel->get_fs_module();
 	fs->close(task->current_dir);
-
+    }
     save_flags(flags); 
     cli();
     remove_task(task);

@@ -24,7 +24,7 @@ struct fs_module fs_module = {
     fs_putc, fs_getc, fs_read_line, fs_write_string, fs_fvprintf, fs_fprintf,
 };
 
-struct kernel_module *kernel;
+
 char root_dir[40];
 
 

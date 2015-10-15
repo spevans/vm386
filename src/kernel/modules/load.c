@@ -14,6 +14,7 @@ static bool fix_relocs(struct mod_hdr *, struct file *, char *, size_t);
 struct module *
 load_module(const char *name)
 {
+    struct fs_module *fs = kernel->get_fs_module();
     struct module *mod = NULL;
     struct file *fh;
     char name_buf[strlen(name) + 32];
@@ -91,6 +92,8 @@ fix_relocs(struct mod_hdr *hdr, struct file *fh, char *mod_start,
 {
 #define RBUFSIZ 64
     size_t i = 0;
+    struct fs_module *fs = kernel->get_fs_module();
+
     if(fs->seek(fh, M_RELOFF(*hdr), SEEK_ABS) >= 0)
     {
 	while(i < (hdr->reloc_size / 4))

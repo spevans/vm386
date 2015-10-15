@@ -5,8 +5,7 @@
 #include <vmm/kernel.h>
 #include <vmm/debug.h>
 
-struct kernel_module *kernel;
-struct shell_module *shell;
+static struct shell_module *shell;
 
 static bool debug_init(void);
 static bool debug_expunge(void);
@@ -23,7 +22,7 @@ debug_init(void)
     shell = (struct shell_module *)kernel->open_module("shell", SYS_VER);
     if(shell != NULL)
     {
-	add_debug_commands();
+	add_debug_commands(shell);
 	return TRUE;
     }
     return FALSE;

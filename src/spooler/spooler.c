@@ -14,9 +14,9 @@
 
 #define kprintf kernel->printf
 
-struct fs_module *fs;
+static struct fs_module *fs;
 #ifdef	PRINTER_M
-struct printer_module *printer;
+static struct printer_module *printer;
 #endif
 static bool not_printing = TRUE;
 static list_t spool_list;

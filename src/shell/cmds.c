@@ -5,13 +5,12 @@
 #include <vmm/string.h>
 #include <vmm/kernel.h>
 #include <vmm/tty.h>
+#include <vmm/fs.h>
 #include <vmm/tasks.h>
 
 #ifndef TEST_SHELL
-#include <vmm/fs.h>
-#include <vmm/tty.h>
-extern struct fs_module *fs;
-extern struct tty_module *tty;
+static struct fs_module *fs;
+static struct tty_module *tty;
 #endif
 
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -170,8 +169,12 @@ struct shell_cmds shell_cmds =
 };
 
 bool
-init_cmds(void)
+init_cmds(struct fs_module *_fs, struct tty_module *_tty)
 {
+#ifndef TEST_SHELL
+    fs = _fs;
+    tty = _tty;
+#endif
     add_cmd_list(&shell_cmds);
     return TRUE;
 }

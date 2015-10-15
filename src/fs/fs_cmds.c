@@ -451,6 +451,7 @@ cmd_bufstats(struct shell *sh, __attribute__ ((unused)) int argc,
     return RC_OK;
 }
 
+#ifndef TEST
 #define DOC_mount "mount [-hd PARTITION-NAME]...\n\
 Mount a device in the file system."
 int
@@ -507,6 +508,7 @@ cmd_umount(struct shell *sh, int argc, char **argv)
     return rc;
 }
 
+
 #define DOC_mkfs "mkfs [-hd PARTITION-NAME [RESERVED-BLOCKS]]\n\
 Create a new file system structure on the hard-disk partition called\n\
 PARTITION-NAME."
@@ -542,15 +544,17 @@ cmd_mkfs(struct shell *sh, int argc, char **argv)
     }
     return rc;
 }
+#endif /* TEST */
 
 struct shell_cmds fs_cmds =
 {
     0,
     { CMD(cp), CMD(type), CMD(ls), CMD(cd), CMD(ln), CMD(mkdir),
       CMD(rm), CMD(rmdir), CMD(mv), CMD(devinfo), CMD(bufstats),
-      CMD(mount), CMD(umount), CMD(mkfs),
 #ifdef TEST
       CMD(ucp),
+#else
+      CMD(mkfs), CMD(mount), CMD(umount),
 #endif
       END_CMD }
 };

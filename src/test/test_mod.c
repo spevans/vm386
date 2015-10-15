@@ -3,7 +3,6 @@
 
 #include <vmm/kernel.h>
 
-struct kernel_module *kernel;
 
 struct test_module {
     struct module base;

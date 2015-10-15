@@ -30,6 +30,8 @@
 #include <stdio.h>
 #endif
 
+static struct shell sys_shell;
+
 struct shell_module shell_module =
 {
     MODULE_INIT("shell", SYS_VER, shell_init, NULL, NULL, NULL),
@@ -41,12 +43,10 @@ struct shell_module shell_module =
     &sys_shell
 };
 
-struct shell sys_shell;
 
 #ifndef TEST_SHELL
-struct kernel_module *kernel;
-struct tty_module *tty;
-struct fs_module *fs;
+static struct tty_module *tty;
+static struct fs_module *fs;
 static void shell_main(void);
 static void shell_kprint(const char *buf, size_t len);
 #endif
@@ -68,8 +68,6 @@ init_shell_struct(struct shell *sh)
 bool
 shell_init(void)
 {
-    if(!init_cmds())
-	return FALSE;
     /* Need to start the shell task? */
 #ifndef TEST_SHELL
     /* setup the shell pointer to allow the loading modules to add their
@@ -80,22 +78,25 @@ shell_init(void)
 	fs = (struct fs_module *)kernel->open_module("fs", SYS_VER);
 	if(fs != NULL)
 	{
-	    init_shell_struct(&sys_shell);
-	    /* Start it in a suspended state. The shell task must have been
-	       created before the tty is allocated, but it can't actually
-	       run until the tty has been allocated! */
-	    sys_shell.task = kernel->add_task(shell_main, 0, 0, "shell");
-	    if(sys_shell.task != NULL)
-	    {
-		sys_shell.tty = tty->open_tty(sys_shell.task, Cooked,
-					      "mda", TRUE);
-		if(sys_shell.tty != NULL)
-		{
-		    /* Now we've finished our initialisation procedure
-		       start the shell task running properly. */
-		    kernel->wake_task(sys_shell.task);
-		    kernel->set_print_func(shell_kprint);
-		    return TRUE;
+            if (init_cmds(fs, tty))
+            {
+                init_shell_struct(&sys_shell);
+                /* Start it in a suspended state. The shell task must have been
+                   created before the tty is allocated, but it can't actually
+                   run until the tty has been allocated! */
+                sys_shell.task = kernel->add_task(shell_main, 0, 0, "shell");
+                if(sys_shell.task != NULL)
+                {
+                        sys_shell.tty = tty->open_tty(sys_shell.task, Cooked,
+                                                      "mda", TRUE);
+                        if(sys_shell.tty != NULL)
+                        {
+                            /* Now we've finished our initialisation procedure
+                               start the shell task running properly. */
+                            kernel->wake_task(sys_shell.task);
+                            kernel->set_print_func(shell_kprint);
+                            return TRUE;
+                        }
 		}
 		kernel->kill_task(sys_shell.task);
 	    }
@@ -105,7 +106,7 @@ shell_init(void)
     }
     return FALSE;
 #else
-    return TRUE;
+    return init_cmds(NULL, NULL);
 #endif
 }
 

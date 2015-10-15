@@ -19,9 +19,10 @@ struct debug_module
 
 #ifdef DEBUG_MODULE
 
+struct shell_module;
 extern unsigned char *ncode(unsigned char *, unsigned char *, unsigned int,
 			    bool, bool);
-extern bool add_debug_commands(void);
+extern bool add_debug_commands(struct shell_module *shell);
 extern void remove_debug_commands(void);
 
 #endif /* DEBUG_MODULE */

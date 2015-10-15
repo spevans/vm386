@@ -12,7 +12,7 @@
 #include <vmm/tasks.h>
 #include <vmm/traps.h>
 
-extern struct shell_module *shell;
+static struct shell_module *shell;
 
 #define DOC_x "x ADDR...\n\
 Print the contents of the kernel logical address ADDR (ADDR is in hex)."
@@ -495,8 +495,9 @@ struct shell_cmds debug_cmds =
 };
 
 bool
-add_debug_commands(void)
+add_debug_commands(struct shell_module *_shell)
 {
+    shell = _shell;
     kernel->add_shell_cmds(&debug_cmds);
     return TRUE;
 }
