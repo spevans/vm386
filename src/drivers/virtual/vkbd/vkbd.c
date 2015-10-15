@@ -14,6 +14,8 @@
 
 #define kprintf kernel->printf
 
+extern void unimplemented(char *name, struct vm86_regs *regs);
+
 static u_long vkbd_read_port(struct vm *vm, u_short port, int size);
 static void vkbd_write_port(struct vm *vm, u_short port, int size, u_long val);
 static void vkbd_use_key(struct kbd *kbd, int shift_state, u_char key_code,
@@ -21,12 +23,11 @@ static void vkbd_use_key(struct kbd *kbd, int shift_state, u_char key_code,
 static void vkbd_switch_from(struct kbd *kbd, int shift_state);
 static void vkbd_switch_to(struct kbd *kbd, int shift_state);
 
-struct kernel_module *kernel;
-struct vm_module *vm;
-struct kbd_module *kbd;
-struct tty_module *tty;
-struct vpic_module *vpic;
-struct vpit_module *vpit;
+static struct vm_module *vm;
+static struct kbd_module *kbd;
+static struct tty_module *tty;
+static struct vpic_module *vpic;
+static struct vpit_module *vpit;
 
 
 /* Initialise the virtual keyboard structure pointed to by VK. */

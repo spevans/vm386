@@ -236,10 +236,17 @@ get_prefixes(struct vm86_regs *regs)
 void
 vm_gpe_handler(struct trap_regs *regs)
 {
+    static struct vpic_module *vpic = NULL;
+
     struct vm *vm = GET_TASK_VM(kernel->current_task);
     u_long prefixes;
     u_long orig_eip = regs->eip;
     u_char byte;
+
+    if (!vpic) {
+        // FIXME, should vpic be used or should eflags jsut be checked for IF
+        vpic =(struct vpic_module *)kernel->open_module("vpic", SYS_VER);
+    }
 
     DB(("vm_gpe: vm=%p cs:eip=%x:%x ec=%x\n", vm, REGS->cs, REGS->eip,
 	REGS->error_code));
@@ -332,7 +339,9 @@ vm_gpe_handler(struct trap_regs *regs)
     case 0xfa:			/* CLI */
 	DB(("vm_gpe: CLI\n"));
 	vm->virtual_eflags &= ~FLAGS_IF;
-	vpic->IF_disabled(vm);
+	if (vpic) {
+            vpic->IF_disabled(vm);
+        }
 	break;
 
     case 0xfb:			/* STI */
@@ -352,7 +361,9 @@ vm_gpe_handler(struct trap_regs *regs)
 	    vm->hlted = TRUE;
 	    kernel->suspend_task(vm->task);
 	}
-	vpic->IF_enabled(vm);
+        if (vpic) {
+            vpic->IF_enabled(vm);
+        }
 	break;
 
     case 0x9c:			/* PUSHF Fv */
@@ -383,10 +394,12 @@ vm_gpe_handler(struct trap_regs *regs)
 	}
 	REGS->eflags = ((vm->virtual_eflags & USER_EFLAGS)
 			| FLAGS_IF | EFLAGS_VM);
-	if(vm->virtual_eflags & FLAGS_IF)
-	    vpic->IF_enabled(vm);
-	else
-	    vpic->IF_disabled(vm);
+        if (vpic) {
+            if(vm->virtual_eflags & FLAGS_IF)
+                vpic->IF_enabled(vm);
+            else
+                vpic->IF_disabled(vm);
+        }
 	break;
 
     case 0xcc:			/* INT 3 */
@@ -418,10 +431,12 @@ vm_gpe_handler(struct trap_regs *regs)
 	    vm->virtual_eflags = SET16(vm->virtual_eflags, pop_sp(REGS, 2));
 	REGS->eflags = ((vm->virtual_eflags & USER_EFLAGS)
 			| FLAGS_IF | EFLAGS_VM);
-	if(vm->virtual_eflags & FLAGS_IF)
-	    vpic->IF_enabled(vm);
-	else
-	    vpic->IF_disabled(vm);
+        if (vpic) {
+            if(vm->virtual_eflags & FLAGS_IF)
+                vpic->IF_enabled(vm);
+            else
+                vpic->IF_disabled(vm);
+        }
 	break;
 
     case 0xf4:			/* HLT */

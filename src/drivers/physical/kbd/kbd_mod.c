@@ -15,7 +15,6 @@ struct kbd_module kbd_module =
     kbd_set_leds
 };
 
-struct kernel_module *kernel;
 
 static bool
 init_kbd_driver(void)

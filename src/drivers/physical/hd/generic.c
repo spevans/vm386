@@ -28,6 +28,8 @@
 
 /* Hard disk device structure management. */
 
+static struct fs_module *fs;
+
 /* List of all hard-disk like devices in the system. */
 hd_dev_t *hd_list;
 
@@ -51,9 +53,10 @@ static hd_partition_t *free_partitions;
 hd_partition_t *partition_list;
 
 void
-init_partitions(void)
+init_partitions(struct fs_module *_fs)
 {
     int i;
+    fs = _fs;
     for(i = 0; i < (NR_PARTITIONS-1); i++)
 	partition_pool[i].next = &partition_pool[i+1];
     partition_pool[i].next = NULL;

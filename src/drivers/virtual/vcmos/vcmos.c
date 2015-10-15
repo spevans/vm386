@@ -23,9 +23,8 @@
 
 #define kprintf kernel->printf
 
-struct kernel_module *kernel;
-struct vm_module *vm;
-struct vpic_module *vpic;
+static struct vm_module *vm;
+static struct vpic_module *vpic;
 
 static int vm_slot;
 

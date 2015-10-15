@@ -37,7 +37,7 @@ static blkreq_t *current_req;
 
 static void do_request(blkreq_t *req);
 
-struct fs_module *fs;
+static struct fs_module *fs;
 
 
 /* Pull in the two functions from <vmm/blkdev.h> */
@@ -193,10 +193,16 @@ ramdisk_init(void)
 	init_list(&rd_reqs);
 	init_list(&rd_dev_list);
 	fs = (struct fs_module *)kernel->open_module("fs", SYS_VER);
-        if(create_ramdisk(1440) == NULL) return FALSE;
-	DB(("ramdisk created\n"));
-	add_ramdisk_commands();
-	return TRUE;
+        if (fs != NULL) {
+            if(create_ramdisk(1440) != NULL) {
+                DB(("ramdisk created\n"));
+                add_ramdisk_commands();
+                return TRUE;
+            }
+            kernel->close_module((struct module *)fs);
+            fs = NULL;
+        }
+        return FALSE;
 }
 
 

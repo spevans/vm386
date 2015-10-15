@@ -29,9 +29,8 @@ struct vfloppy {
     struct vm_kill_handler kh;
 };
 
-struct kernel_module *kernel;
-struct fs_module *fs;
-struct vm_module *vm;
+static struct fs_module *fs;
+static struct vm_module *vm;
 
 static int vm_slot;
 

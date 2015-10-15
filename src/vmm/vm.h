@@ -141,7 +141,6 @@ struct shell;
 /* from vmach.c */
 extern struct io_handler *global_io;
 extern bool verbose_io;
-extern struct vpic_module *vpic;
 extern bool init_vm(void);
 extern struct vm *create_vm(const char *name, u_long virtual_mem,
 			    const char *display_type);

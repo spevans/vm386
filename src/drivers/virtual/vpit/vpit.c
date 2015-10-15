@@ -21,11 +21,10 @@ static bool initialised;
 static bool do_init(void);
 #define INITIALISED (initialised || do_init())
 
-struct vm_module *vm;
+static struct vm_module *vm;
 int vpit_slot;
-struct vpic_module *vpic;
+static struct vpic_module *vpic;
 
-struct kernel_module *kernel;
 
 static void vpit_timer_handler(void *);
 

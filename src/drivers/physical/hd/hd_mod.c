@@ -5,8 +5,8 @@
 #include <vmm/hd.h>
 #include <vmm/kernel.h>
 
-struct kernel_module *kernel;
-struct fs_module *fs;
+
+static struct fs_module *fs;
 
 struct hd_module hd_module =
 {
@@ -22,9 +22,9 @@ hd_init(void)
     fs = (struct fs_module *)kernel->open_module("fs", SYS_VER);
     if(fs != NULL)
     {
-	init_partitions();
+	init_partitions(fs);
 	ide_init();
-	add_hd_commands();
+	add_hd_commands(fs);
 	return TRUE;
     }
     return FALSE;

@@ -5,7 +5,6 @@
 #include <vmm/kernel.h>
 #include <vmm/shell.h>
 
-struct kernel_module *kernel;
 
 static bool
 vm_init(void)

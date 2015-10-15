@@ -43,11 +43,10 @@ struct vide {
     struct vm_kill_handler kh;
 };
 
-struct kernel_module *kernel;
-struct fs_module *fs;
-struct vm_module *vm;
-struct hd_module *hd;
-struct vpic_module *vpic;
+static struct fs_module *fs;
+static struct vm_module *vm;
+static struct hd_module *hd;
+static struct vpic_module *vpic;
 
 static int vm_slot;
 

@@ -6,8 +6,6 @@
 #include "fd.h"
 
 
-extern struct fs_module *fs;
-
 long floppy_read_blocks(fd_dev_t *fd, void *buf, u_long block, int count)
 {
 	blkreq_t req;
@@ -75,6 +73,7 @@ long floppy_force_seek(__attribute__ ((unused)) fd_dev_t *fd, u_long cyl)
 bool floppy_add_dev(fd_dev_t *fd) 
 {
 	struct fs_device *dev;
+        struct fs_module *fs = kernel->get_fs_module();
 
 	start_motor(fd);
 	fdc_specify(fd);

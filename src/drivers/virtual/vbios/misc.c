@@ -12,10 +12,41 @@
 
 #define kprintf kernel->printf
 
-extern struct vprinter_module *vprinter;
+static struct vm_module *vm;
+static struct vprinter_module *vprinter;
+static struct vcmos_module *vcmos;
 
-extern struct vm_module *vm;
-extern struct vcmos_module *vcmos;
+
+void
+deinit_vbios_misc(void)
+{
+    if (vcmos != NULL) {
+        kernel->close_module((struct module *)vcmos);
+        vcmos = NULL;
+    }
+
+    if (vprinter != NULL) {
+        kernel->close_module((struct module *)vprinter);
+        vprinter = NULL;
+    }
+}
+
+
+bool
+init_vbios_misc(struct vm *vmach, struct vm_module *_vm)
+{
+    vm = _vm;
+    if(vmach->hardware.lprports[0]) {
+        vprinter = (struct vprinter_module *)kernel->open_module("vprinter", SYS_VER);
+    }
+
+    if (vmach->hardware.got_cmos) {
+        vcmos = (struct vcmos_module *)kernel->open_module("vcmos", SYS_VER);
+    }
+
+    return TRUE;
+}
+
 
 void
 unimplemented(char *name, struct vm86_regs *regs)

@@ -6,9 +6,8 @@
 #include <vmm/floppy.h>
 #include <vmm/kernel.h>
 
-struct kernel_module *kernel;
-struct shell_module *shell;
-struct fs_module *fs;
+static struct shell_module *shell;
+static struct fs_module *fs;
 
 static bool fd_init(void);
 static bool fd_expunge(void);

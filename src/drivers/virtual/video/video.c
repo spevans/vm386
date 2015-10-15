@@ -40,8 +40,7 @@ struct io_handler video_io = {
     NULL, "video", 0x3c0, 0x3df, video_in, video_out
 };
 
-struct kernel_module *kernel;
-struct vm_module *vm;
+static struct vm_module *vm;
 
 struct video *viewed_video;
 

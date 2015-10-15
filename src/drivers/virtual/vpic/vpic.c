@@ -17,10 +17,9 @@ static bool initialised;
 static bool do_init(void);
 #define INITIALISED (initialised || do_init())
 
-struct vm_module *vm;
+static struct vm_module *vm;
 int vpic_slot;
 
-struct kernel_module *kernel;
 
 
 /* Virtual device stuff. */

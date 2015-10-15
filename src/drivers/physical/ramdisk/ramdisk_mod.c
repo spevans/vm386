@@ -5,7 +5,6 @@
 #include <vmm/ramdisk.h>
 #include <vmm/kernel.h>
 
-struct kernel_module *kernel;
 
 struct ramdisk_module ramdisk_module =
 {

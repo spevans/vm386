@@ -10,6 +10,11 @@
 #include <vmm/page.h>
 #include <vmm/vm.h>
 #include <vmm/time.h>
+#include <vmm/tty.h>
+#include <vmm/vide.h>
+#include <vmm/vfloppy.h>
+#include <vmm/vprinter.h>
+#include <vmm/vcmos.h>
 
 struct vbios {
     struct vm *vm;
@@ -91,18 +96,24 @@ struct bios_data {
 #ifdef VBIOS_MODULE
 
 /* from video.c */
+extern bool init_vbios_video(void);
+extern void deinit_vbios_video(void);
 extern void vbios_video_handler(struct vm *vm, struct vm86_regs *regs);
 
 /* from disk.c */
+extern bool init_vbios_disk(void);
+extern void deinit_vbios_disk(void);
 extern void vbios_disk_handler(struct vm *vm, struct vm86_regs *regs);
 
 /* from misc.c */
+extern bool init_vbios_misc(struct vm *, struct vm_module *);
+extern void deinit_vbios_misc(void);
 extern void unimplemented(char *name, struct vm86_regs *regs);
 extern void vbios_ser_handler(struct vm *vm, struct vm86_regs *regs);
 extern void vbios_par_handler(struct vm *vm, struct vm86_regs *regs);
 extern void vbios_timer_handler(struct vm *vm, struct vm86_regs *regs);
 extern void vbios_sys_handler(struct vm *vm, struct vm86_regs *regs,
-			      struct vbios *vbios);
+                              struct vbios *vbios);
 
 #endif /* VBIOS_MODULE */
 #else /* __ASM__ */

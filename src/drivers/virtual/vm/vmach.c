@@ -29,7 +29,7 @@ bool verbose_io;
    what to do with (i.e. ROMs). */
 static page *empty_page;
 
-struct vpic_module *vpic;
+static struct vpic_module *vpic;
 
 bool
 init_vm(void)

@@ -12,8 +12,42 @@
 
 #define kprintf kernel->printf
 
-extern struct video_module *video;
-extern struct tty_module *tty;
+extern void unimplemented(char *name, struct vm86_regs *regs);
+
+static struct video_module *video;
+static struct tty_module *tty;
+
+
+void
+deinit_vbios_video(void)
+{
+    if (video != NULL) {
+        kernel->close_module((struct module *)video);
+        video = NULL;
+    }
+
+    if (tty != NULL) {
+        kernel->close_module((struct module *)tty);
+        tty = NULL;
+    }
+}
+
+
+bool
+init_vbios_video(void)
+{
+    video = (struct video_module *)kernel->open_module("video", SYS_VER);
+    if(video != NULL) {
+        tty = (struct tty_module *)kernel->open_module("tty", SYS_VER);
+        if(tty != NULL) {
+            return TRUE;
+        }
+    }
+
+    deinit_vbios_video();
+    return FALSE;
+}
+
 
 static inline void
 bios_scroll_up_one(struct tty *vmtty, short page)

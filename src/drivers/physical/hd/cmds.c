@@ -9,6 +9,8 @@
 #include <vmm/kernel.h>
 #include <vmm/tasks.h>
 
+static struct fs_module *fs;
+
 #define DOC_hdinfo "hdinfo\n\
 Print information about the hard-disk driver."
 int
@@ -116,8 +118,9 @@ struct shell_cmds hd_cmds =
 };
 
 bool
-add_hd_commands(void)
+add_hd_commands(struct fs_module *_fs)
 {
+    fs = _fs;
     kernel->add_shell_cmds(&hd_cmds);
     return TRUE;
 }

@@ -6,6 +6,7 @@
 
 #include <vmm/types.h>
 #include <vmm/module.h>
+#include <vmm/fs.h>
 
 #define PARTN_NAME_MAX 8
 
@@ -55,7 +56,7 @@ extern void ide_init(void);
 /* from generic.c */
 extern hd_dev_t *hd_list;
 extern hd_partition_t *partition_list;
-extern void init_partitions(void);
+extern void init_partitions(struct fs_module *fs);
 extern hd_partition_t *hd_find_partition(const char *name);
 extern bool hd_add_dev(hd_dev_t *hd);
 extern bool hd_remove_dev(hd_dev_t *hd);
@@ -67,10 +68,9 @@ extern bool hd_mkfs_partition(hd_partition_t *p, u_long reserved);
 /* from hd_mod.c */
 extern struct hd_module hd_module;
 extern bool hd_init(void);
-extern struct fs_module *fs;
 
 /* from cmds.c */
-extern bool add_hd_commands(void);
+extern bool add_hd_commands(struct fs_module *fs);
 
 #endif /* HD_MODULE */
 #endif /* _VMM_HD_H */

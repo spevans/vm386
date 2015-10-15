@@ -10,10 +10,9 @@
 // Most of these commands are for testing so they ignore the parameters
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 
-extern struct shell_module *shell;
 
 #undef kprintf
-#define kprintf shell->printf
+#define kprintf sh->shell->printf
 
 #define DOC_fdinfo "fdinfo\n\
 Print information about the floppy-disk driver."

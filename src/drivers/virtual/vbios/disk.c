@@ -13,9 +13,41 @@
 
 #define kprintf kernel->printf
 
-extern struct vide_module *vide;
-extern struct vfloppy_module *vfloppy;
-extern struct fs_module *fs;
+extern void unimplemented(char *name, struct vm86_regs *regs);
+
+static struct vide_module *vide;
+static struct vfloppy_module *vfloppy;
+
+
+void
+deinit_vbios_disk(void)
+{
+    if (vide != NULL) {
+        kernel->close_module((struct module *)vide);
+        vide = NULL;
+    }
+    if (vfloppy != NULL) {
+        kernel->close_module((struct module *)vfloppy);
+        vfloppy = NULL;
+    }
+}
+
+
+bool
+init_vbios_disk(void)
+{
+    vide = (struct vide_module *)kernel->open_module("vide", SYS_VER);
+    if(vide != NULL) {
+        vfloppy = (struct vfloppy_module *)kernel->open_module("vfloppy", SYS_VER);
+        if(vfloppy != NULL) {
+            return TRUE;
+        }
+    }
+    deinit_vbios_disk();
+
+    return FALSE;
+}
+
 
 static void
 get_hd_stat(struct vm *vm, struct vm86_regs *regs)
