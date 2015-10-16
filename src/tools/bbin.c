@@ -45,18 +45,18 @@ int main(int argc, char *argv[])
         uint32_t header_sz = data(buffer, 1);
 	if(header_sz != HEADER_SIZE) {
                 char buf[64];
-                sprintf(buf, "bad header - incorrect size %u != %lu\n", header_sz, HEADER_SIZE);
+                sprintf(buf, "bad header - incorrect size %u != %u\n", header_sz, HEADER_SIZE);
 		quit(buf);
         }
 
 	c = data(buffer, 2);
-	printf("Code Size: %lu bytes\n", c);
+	printf("Code Size: %u bytes\n", c);
 	d = data(buffer, 3);
-	printf("Data Size: %lu bytes\n", d);
+	printf("Data Size: %u bytes\n", d);
 	b = data(buffer, 4);
-	printf("Bss Size: %lu bytes\n", b);
+	printf("Bss Size: %u bytes\n", b);
 	s = data(buffer, 7);
-	printf("Symbol Table Size: %lu bytes\n", s);
+	printf("Symbol Table Size: %u bytes\n", s);
 	if(d|b|s)
 		quit("Only a code segment should be present\n");
 	if(c != 512)

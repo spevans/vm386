@@ -10,6 +10,20 @@
 #define WORD_BOOT_PARAM(x)	*((unsigned short int *)(&bpb.boot_code[BOOT_PARAMS+x]))
 #define DWORD_BOOT_PARAM(x)	*((unsigned int *)(&bpb.boot_code[BOOT_PARAMS+x]))
 
+struct hd_partition {
+  unsigned char active_flag;
+  unsigned char start_head;
+  unsigned short start_cylsec;
+  unsigned char system;
+  unsigned char end_head;
+  unsigned short end_cylsec;
+  unsigned long LBA_start;
+  unsigned long part_len;
+} __attribute__((__packed__));
+
+typedef struct hd_partition hd_partition_t;
+
+
 void get_info(char *dev, unsigned long *lba,
 	unsigned short *cylsec, unsigned char *head);
  
@@ -126,21 +140,6 @@ int main(int argc, char *argv[])
 	fclose(kernel);
 	return 0;
 }	
-
-
-#define __PACK__ __attribute__ ((packed))
-
-typedef struct hd_partition {
-  unsigned char active_flag __PACK__ ;
-  unsigned char start_head __PACK__ ;
-  unsigned short start_cylsec __PACK__ ;
-  unsigned char system __PACK__ ;
-  unsigned char end_head __PACK__ ;
-  unsigned short end_cylsec __PACK__ ;
-  unsigned long LBA_start __PACK__ ;
-  unsigned long part_len __PACK__ ;
-} hd_partition_t;
-
 
 
 void get_info(char *dev, unsigned long *lba,

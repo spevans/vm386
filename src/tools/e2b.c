@@ -36,7 +36,7 @@ int main(int argc, char *argv[])
 	printf("Start Address is 0x%8.8X\n", header.a_entry);
 	printf("Relocation info for text is %d bytes\n", header.a_trsize);
 	printf("Relocation info for data is %d bytes\n", header.a_drsize);
-	printf("N_MAGIC = %lo [%s]\n", N_MAGIC(header),
+	printf("N_MAGIC = %o [%s]\n", N_MAGIC(header),
 	       N_MAGIC(header) == QMAGIC ? "QMAGIC" :
 	       (N_MAGIC(header) == ZMAGIC ? "ZMAGIC" : "?"));
 	printf("Offset to text is 0x%8.8X\n", N_TXTOFF(header));
@@ -52,7 +52,7 @@ int main(int argc, char *argv[])
 	}
 	else
 	{
-	    printf("N_MAGIC(hdr) = %#lo, aborting\n", N_MAGIC(header));
+	    printf("N_MAGIC(hdr) = %#o, aborting\n", N_MAGIC(header));
 	    exit(10);
 	}
 #if 0

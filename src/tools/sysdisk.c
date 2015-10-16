@@ -9,6 +9,20 @@
 #define WORD_BOOT_PARAM(x)	*((unsigned short int *)(&bpb.boot_code[BOOT_PARAMS+x]))
 #define DWORD_BOOT_PARAM(x)	*((unsigned int *)(&bpb.boot_code[BOOT_PARAMS+x]))
 
+struct hd_partition {
+  unsigned char active_flag;
+  unsigned char start_head;
+  unsigned short start_cylsec;
+  unsigned char system;
+  unsigned char end_head;
+  unsigned short end_cylsec;
+  unsigned long LBA_start;
+  unsigned long part_len;
+} __attribute__((__packed__));
+
+typedef struct hd_partition hd_partition_t;
+
+
 void get_info(char *dev, unsigned long *lba,
         unsigned short *cylsec, unsigned char *head);
 
@@ -98,6 +112,12 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+        printf("magic = %4.4lX\n", bpb.magic);
+        printf("total blocks: %lu\ninode bitmap blk: %lu\ninodes blk: %lu\n",
+               bpb.sup.total_blocks, bpb.sup.inode_bitmap, bpb.sup.inodes);
+        printf("num inodes: %lu\ndata bitmap blk: %lu data blk: %lu\ndata size: %lu\n",
+               bpb.sup.num_inodes, bpb.sup.data_bitmap, bpb.sup.data, bpb.sup.data_size);
+
 	start16 = do_open(argv[1]);
 	kernel = do_open(argv[2]);
 
@@ -124,7 +144,7 @@ int main(int argc, char *argv[])
         BYTE_BOOT_PARAM(2) = head; /* head */
         DWORD_BOOT_PARAM(3) = lba + (FS_BLKSIZ / 512); /* lba start */
         DWORD_BOOT_PARAM(7) = sector_len;
-        printf("start16 LBA: %lu sector length = %lu\n", DWORD_BOOT_PARAM(3),
+        printf("start16 LBA: %u sector length = %u\n", DWORD_BOOT_PARAM(3),
                DWORD_BOOT_PARAM(7));
 
         DWORD_BOOT_PARAM(14) = lba + sector_len + 2;
@@ -136,7 +156,7 @@ int main(int argc, char *argv[])
         BYTE_BOOT_PARAM(13)= 0;
         DWORD_BOOT_PARAM(18) = sector_len;
         BYTE_BOOT_PARAM(22) = (unsigned char)boot_dev;
-        printf("kernel LBA: %lu sector length = %lu\n", DWORD_BOOT_PARAM(14),
+        printf("kernel LBA: %u sector length = %u\n", DWORD_BOOT_PARAM(14),
                DWORD_BOOT_PARAM(18));
 
 	fwrite(&bpb, 1, FS_BLKSIZ, sys_file);
@@ -148,21 +168,6 @@ int main(int argc, char *argv[])
 	fclose(kernel);
 	return 0;
 }	
-
-
-#define __PACK__ __attribute__ ((packed))
-
-typedef struct hd_partition {
-  unsigned char active_flag __PACK__ ;
-  unsigned char start_head __PACK__ ;
-  unsigned short start_cylsec __PACK__ ;
-  unsigned char system __PACK__ ;
-  unsigned char end_head __PACK__ ;
-  unsigned short end_cylsec __PACK__ ;
-  unsigned long LBA_start __PACK__ ;
-  unsigned long part_len __PACK__ ;
-} hd_partition_t;
-
 
 
 void get_info(char *dev, unsigned long *lba,

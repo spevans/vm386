@@ -36,7 +36,7 @@ int main(int argc, char *argv[])
 	bb_file = do_open(argv[1]);
         if (argc == 3) {
                 long offset = atol(argv[2]);
-                printf("offset = %ul\n", offset);
+                printf("offset = %lu\n", offset);
                 if (fseek(bb_file, offset, SEEK_SET) != offset) {
                         perror("fseek: ");
                         return 1;
