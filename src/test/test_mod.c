@@ -10,8 +10,9 @@ struct test_module {
 
 const int some_data = 23;
 static char some_bss[99];
+char *data_ptr = &some_bss[20];
+int const *int_ptr = &some_data;
 
-extern struct mod_code_hdr *_test_start;
 #define printf kernel->printf
 
 bool test_init(void);
@@ -25,10 +26,6 @@ struct test_module test_module =
 
 bool test_init(void)
 {
-    printf("test_init():\ntest_start\t%p\n", _test_start);
-    printf("test_module\t%p\n", _test_start->mod_ptr);
-    printf("test_end\t%p\n", _test_start->next_mod);
-    printf("kernel_ptr\t%p\n",  _test_start->kernel_ptr);
     printf("kernel\t%p\n", kernel);
     printf("test_module\t%p\n", &test_module);
     printf("name\t%s\n", test_module.base.name);

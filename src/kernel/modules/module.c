@@ -9,6 +9,8 @@
 #include <vmm/io.h>
 #include <vmm/tasks.h>
 
+#include "static_modules.h"
+
 /* List of loaded modules. */
 static struct module *mod_chain;
 
@@ -183,22 +185,13 @@ add_static_module(struct module *mod)
 bool
 init_static_modules(void)
 {
-    struct mod_code_hdr *hdr = &__first_static_module;
-    while(hdr != &__last_static_module)
-    {
-	kprintf("Initialising `%s.module'\n", hdr->mod_ptr->name);
-	DB(("hdr=%p hdr->mod=%p hdr->kernel=%p hdr->next=%p\n",
-	    hdr, hdr->mod_ptr, hdr->kernel_ptr, hdr->next_mod));
-	if(hdr->kernel_ptr != &kernel)
-	    *(hdr->kernel_ptr) = kernel;
-	hdr->mod_ptr->mod_start = (char *)hdr;
-	hdr->mod_ptr->mod_size = (u_long)hdr->next_mod - (u_long)hdr;
- 	if(!add_static_module(hdr->mod_ptr))
-	{
-	    kprintf("Error: can't initialise `%s.module'\n",
-		    hdr->mod_ptr->name);
+    for (size_t idx = 0; idx < static_module_count; idx++) {
+        struct module *module = static_modules[idx];
+        kprintf("Initialising `%s.module'\n", module->name);
+        module->mod_start = module;
+        if(!add_static_module(module)) {
+	    kprintf("Error: can't initialise `%s.module'\n", module->name);
 	}
-	hdr = hdr->next_mod;
     }
     return TRUE;
 }

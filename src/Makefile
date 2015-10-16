@@ -20,7 +20,6 @@ all : kernel
 .PHONY : kernel image sys disk root install rclean clean realclean nobak tar
 
 kernel :
-	$(SHELL) -ec "$(MAKE) -C kernel/modules mld mstrip"
 	set -e; for dir in $(SUBDIRS); do $(MAKE) -C $$dir; done
 
 image :

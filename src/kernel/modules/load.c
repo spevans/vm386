@@ -6,7 +6,6 @@
 #include <vmm/kernel.h>
 #include <vmm/fs.h>
 
-static bool fix_relocs(struct mod_hdr *, struct file *, char *, size_t);
 
 /* Load the module called NAME from disk into memory, perform any relocations
    necessary and call it's initialisation function, if this returns non-zero
@@ -14,6 +13,7 @@ static bool fix_relocs(struct mod_hdr *, struct file *, char *, size_t);
 struct module *
 load_module(const char *name)
 {
+#if 0
     struct fs_module *fs = kernel->get_fs_module();
     struct module *mod = NULL;
     struct file *fh;
@@ -67,8 +67,9 @@ load_module(const char *name)
 	fs->close(fh);
     }
     else
-	kprintf("load_module: can't open file `%s'\n", name_buf);
-    return mod;
+#endif
+	kprintf("load_module: can't open file `%s'\n", name);
+    return NULL;
 }
 
 /* Deallocate all memory associated with the module MOD, basically its code
@@ -84,6 +85,7 @@ free_module(struct module *mod)
     }
 }
 
+#if 0
 /* Perform all relocations on the module MOD. HDR was read from the start
    of the module's file, FH. */
 static bool
@@ -115,3 +117,4 @@ fix_relocs(struct mod_hdr *hdr, struct file *fh, char *mod_start,
 	return FALSE;
     return TRUE;
 }
+#endif

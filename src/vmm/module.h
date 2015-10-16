@@ -123,12 +123,6 @@ struct mod_hdr {
     u_char reserved2[32];	/* sizeof(struct mod_hdr) == 48 */
 };
 
-struct mod_code_hdr {
-    struct module *mod_ptr;		/* module's base structure */
-    struct kernel_module **kernel_ptr;	/* module's kernel pointer */
-    struct mod_code_hdr *next_mod;	/* the end of this module's code */
-};
-
 #define MOD_MAGIC 0xDF41
 #define MOD_STRUCT_REV 1
 

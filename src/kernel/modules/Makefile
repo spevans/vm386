@@ -3,7 +3,7 @@
 SRCS = module.c load.c
 OBJS = $(SRCS:.c=.o)
 
-all : mld mstrip mdump modules.o
+all : modules.o
 
 TOPDIR = ../..
 include $(TOPDIR)/Makedefs
@@ -14,13 +14,15 @@ STATIC_MODS := $(foreach mod, $(shell cat $(TOPDIR)/STATIC), $(TOPDIR)/$(mod).mo
 
 example.module : example_mod.o
 
-linker.script : $(TOPDIR)/STATIC
-	./build_script.pl <$^ >$@
+static_modules.h : $(TOPDIR)/STATIC
+	./static_modules.pl <$^ >$@
 
-modules.o : linker.script  $(OBJS) $(STATIC_MODS) $(TOPDIR)/STATIC
-	ld -r -T linker.script -Map=modules.map
+module.c : static_modules.h
+
+modules.o : $(OBJS) $(STATIC_MODS)
+	$(LD) -r -o $@ $(filter %.o, $^)
 
 clean :
-	rm -f *~ *.[od] example.module mld mstrip objlist mdump core
+	rm -f *~ *.[od] example.module objlist core static_modules.h
 
-include $(SRCS:.c=.d) mld.d mstrip.d mdump.d
+include $(SRCS:.c=.d)

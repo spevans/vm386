@@ -12,7 +12,7 @@ LD86 := ld86
 
 MLD := $(TOPDIR)/kernel/modules/mld-elf
 MSTRIP := $(STRIP)
-MSTRIPFLAGS := --remove-section=.comment --remove-section=.eh_frame -g
+MSTRIPFLAGS := 
 
 CFLAGS := -O2 -std=gnu99 -Wall -Wstrict-prototypes $(VMM_CFLAGS) -fno-strict-aliasing -fno-builtin -m32 -march=i386 -Werror -Wall -Wextra -Wno-attributes -fno-common
 
@@ -71,7 +71,7 @@ endif
 # the module's `struct module'. For a module `FOO', this symbol must be
 # `_FOO_module'.
 %.module :
-	$(CC) -c $(TOPDIR)/kernel/modules/crt0.S -o $*_crt0.o -DMODNAME=$*
-	$(LD) $(LDFLAGS) -r $*_crt0.o $^ -o $@.o
+	$(LD) $(LDFLAGS) -r $^ -o $@.o
 	$(NM) $@.o | grep -v '_compiled' | sort >$@.map
-	cp $@.o $@
+	#$(MSTRIP) $(MSTRIPFLAGS) --keep-symbol=kernel --keep-symbol=$*_module -o $@ $@.o
+	#$(MSTRIP) --strip-unneeded -o $@ $@.o
