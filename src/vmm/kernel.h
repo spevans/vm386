@@ -137,10 +137,10 @@ extern void kernel_mod_init2(void);
 extern struct fs_module *get_fs_module(void);
 
 /* from printf.c */
-extern void kvsprintf(char *buf, const char *fmt, va_list args);
-extern void ksprintf(char *buf, const char *fmt, ...);
-extern void kvprintf(const char *fmt, va_list args);
-extern void kprintf(const char *fmt, ...);
+extern void kvsprintf(char *buf, const char *fmt, va_list args) __attribute__ ((format (printf, 2, 0)));
+extern void ksprintf(char *buf, const char *fmt, ...) __attribute__ ((format (printf, 2, 3)));
+extern void kvprintf(const char *fmt, va_list args) __attribute__ ((format (printf, 1, 0)));
+extern void kprintf(const char *fmt, ...) __attribute__ ((format (printf, 1, 2)));
 extern void set_kprint_func(void (*func)(const char *, size_t));
 
 /* from cmds.c */

@@ -191,7 +191,7 @@ schedule(void)
 
 #ifdef PARANOID
     if(intr_nest_count != 0)
-	kprintf("schedule: Oops, being called with intr_nest_count=%d\n",
+	kprintf("schedule: Oops, being called with intr_nest_count=%lu\n",
 		intr_nest_count);
 #endif
 

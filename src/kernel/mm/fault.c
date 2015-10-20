@@ -36,7 +36,7 @@ page_exception_handler(struct trap_regs *regs)
 		 && current_task->pfl_handler(regs, page_phys_addr
 					      | page_offset)))
 	    {
-		kprintf("User level page protection violation; addr=%#0x ec=%#0x\n",
+		kprintf("User level page protection violation; addr=%#0lx ec=%#0x\n",
 			page_phys_addr | page_offset, regs->error_code);
 		dump_regs(regs, TRUE);
 	    }
@@ -45,7 +45,7 @@ page_exception_handler(struct trap_regs *regs)
 	{
 	    /* From a level zero task. Eek. Actually this shouldn't ever
 	       happen unless we start setting the WP bit on 486s.. */
-	    kprintf("Level 0 page protection violation; addr=%#0x ec=%#0x\n",
+	    kprintf("Level 0 page protection violation; addr=%#0lx ec=%#0x\n",
 		    page_phys_addr | page_offset, regs->error_code);
 	    dump_regs(regs, TRUE);
 	}
@@ -58,7 +58,7 @@ page_exception_handler(struct trap_regs *regs)
 	       || (page_phys_addr >= TO_LINEAR(kernel_brk))))
 	{
 	    /* Someone in level 0 is accessing a page they shouldn't! */
-	    kprintf("Level 0 invalid not-present-page access; addr=%#0x ec=%#0x\n",
+	    kprintf("Level 0 invalid not-present-page access; addr=%#0lx ec=%#0x\n",
 		    page_phys_addr | page_offset, regs->error_code);
 	    dump_regs(regs, TRUE);
 	}

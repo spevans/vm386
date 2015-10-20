@@ -48,15 +48,15 @@ void main_kernel()
 	add_pages((u_long)logical_top_of_kernel, 0xA0000);
 	add_pages(0x100000, total_mem);
 
-	printk("End of Static Kernel at %08X\n", &_kernel_end);
-	printk("End of Kernel data at %08X\n", &_data_end);
-	printk("End of Kernel text at %08X\n", &_text_end);
-	printk("Page Directory at %08X\n",kernel_page_dir);
+	printk("End of Static Kernel at %p\n", &_kernel_end);
+	printk("End of Kernel data at %p\n", &_data_end);
+	printk("End of Kernel text at %p\n", &_text_end);
+	printk("Page Directory at %8.8lX\n",kernel_page_dir);
 	printk("Total Memory = %dK\n", total_mem / 1024);
-	printk("%d Pages added giving %dK free\n", free_page_count(),
+	printk("%lu Pages added giving %luK free\n", free_page_count(),
 		free_page_count() * 4);
 
-	printk("Rootdev: %s\n", &root_dev);
+	printk("Rootdev: %s\n", root_dev);
 	printk("Initialising memory management..");
 	init_mm();
 	printk(" done.\n");

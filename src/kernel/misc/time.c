@@ -387,7 +387,7 @@ init_time(void)
             /* 1/32 of a second has elapsed */
             mums = delay_loop_counter << 5;
             /* mums = count for 1 second of delay */
-            printk("%d.%0d made-up-mips...",
+            printk("%lu.%0lu made-up-mips...",
                 mums / 1000000, (mums / 10000) % 100);
             return;
         }

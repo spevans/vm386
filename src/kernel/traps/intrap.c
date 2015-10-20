@@ -69,7 +69,7 @@ void dump_regs(struct trap_regs *regs, bool halt)
 	    }
 	    else
 	    {
-		printk("Suspending task %d\n", current_task->pid);
+		printk("Suspending task %lu\n", current_task->pid);
 		current_task->flags |= TASK_FROZEN;
 		suspend_task(current_task);
 	    }
@@ -123,7 +123,7 @@ void debug_exception_handler(struct trap_regs *regs)
 		    reg = 3;
 		    addr = get_dr3();
 		}
-		kprintf("*** Debug exception: cs:eip=%x:%x reg=%d addr=%#x (dr7=%#08x)\n",
+		kprintf("*** Debug exception: cs:eip=%x:%x reg=%d addr=%#lx (dr7=%#08lx)\n",
 			regs->cs, regs->eip, reg, addr, get_dr7());
 	    }
 	    else

@@ -95,7 +95,7 @@ void setup_dma(struct DmaBuf *DmaInfo, u_int8 Mode)
 
 	DmaPort = &DmaPorts[Chan];
 
-	kprintf("DMA: Chan:%01X Buf:%08X PBuf:%08X Page:%02X Offset:%04X Len:%04X\n",
+	kprintf("DMA: Chan:%01X Buf:%p PBuf:%08lX Page:%02X Offset:%04X Len:%04X\n",
 		Chan, DmaInfo->Buffer, TO_PHYSICAL(DmaInfo->Buffer),
 		Page, Offset, Len);
 

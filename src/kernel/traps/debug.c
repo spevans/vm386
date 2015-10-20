@@ -35,6 +35,6 @@ set_debug_reg(int reg_set, u_long addr, int type, int size)
 	    | (((size << 2) | type) << (16+reg_set*2))	/* LEN and R/W */
 	    | (2 << (reg_set*2)) 			/* Gx */
 	    | ((type & 1) ? 0x20 : 0));			/* GE if data */
-    kprintf("Set debug reg %d to linear addr %#x (type=%2b, size=%d)\n",
+    kprintf("Set debug reg %d to linear addr %#lx (type=%2d, size=%d)\n",
 	    reg_set, addr, type, size);
 }
