@@ -10,7 +10,7 @@ include $(TOPDIR)/Makedefs
 
 CFLAGS += -DKERNEL
 
-STATIC_MODS := $(foreach mod, $(shell cat $(TOPDIR)/STATIC), $(TOPDIR)/$(mod).module.o)
+STATIC_MODS := $(foreach mod, $(shell grep -v ^\# $(TOPDIR)/STATIC), $(TOPDIR)/$(mod).module.o)
 
 example.module : example_mod.o
 

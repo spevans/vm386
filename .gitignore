@@ -4,13 +4,11 @@
 *.module
 *.map
 *.out
+*.ko
 src/drivers/virtual/vbios/code16*
 src/drivers/virtual/vbios/*.o16
 src/output
 src/kernel/modules/linker.script
-src/kernel/modules/mdump
-src/kernel/modules/mld
-src/kernel/modules/mstrip
 src/shell/shell
 src/tools/bbin
 src/tools/bbin16
@@ -21,3 +19,5 @@ src/tools/e2b
 src/tools/makeimage
 src/tools/sbb
 src/tools/sysdisk
+src/tools/mld-elf
+src/tools/mdump

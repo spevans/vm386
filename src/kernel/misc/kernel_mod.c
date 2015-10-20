@@ -67,8 +67,8 @@ struct kernel_module *kernel;
 
 static struct fs_module *fs;
 
-extern void *start_of_kernel;
-
+extern void *_text_start, *_rodata_start, *_data_start, *_bss_start;
+static struct module_memory modmem;
 void
 kernel_mod_init(void)
 {
@@ -77,9 +77,13 @@ kernel_mod_init(void)
        kernel). */
     kernel = &kernel_module;
     kernel_module.base.is_static = TRUE;
-    kernel_module.base.mod_start = start_of_kernel;
+    modmem.text = _text_start;
+    modmem.rodata = _rodata_start;
+    modmem.data = _data_start;
+    modmem.bss = _bss_start;
+    kernel_module.base.mod_memory = &modmem;
     kernel_module.base.mod_size = ((u_long)logical_top_of_kernel
-				   - (u_long)kernel_module.base.mod_start);
+				   - (u_long)_text_start);
     add_module(&kernel_module.base);
     kernel_module.base.open_count = 1;
     add_kernel_cmds();

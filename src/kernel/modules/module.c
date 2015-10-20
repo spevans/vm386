@@ -188,9 +188,15 @@ init_static_modules(void)
     for (size_t idx = 0; idx < static_module_count; idx++) {
         struct module *module = static_modules[idx];
         kprintf("Initialising `%s.module'\n", module->name);
-        module->mod_start = module;
+        module->mod_memory = malloc(sizeof(struct module_memory));
+        if (module->mod_memory == NULL) {
+            kprintf("Error: can't allocate memory\n");
+            continue;
+        }
+        module->mod_memory->text = module;
         if(!add_static_module(module)) {
 	    kprintf("Error: can't initialise `%s.module'\n", module->name);
+            free(module->mod_memory);
 	}
     }
     return TRUE;
@@ -204,8 +210,10 @@ describe_modules(struct shell *sh)
 		      "Module", "Ver", "Base", "Code", "Length", "Users");
     while(m != NULL)
     {
+            void *code = m->mod_memory ? m->mod_memory->text : 0;
+            const char *name = m->name ? m->name : "unknown";
 	sh->shell->printf(sh, "%-10s  %4u  %10x  %10x  %10x  %5d\n",
-			  m->name, m->version, m, m->mod_start,
+			  name, m->version, m, code,
 			  m->mod_size, m->open_count);
 	m = m->next;
     }
@@ -220,8 +228,8 @@ which_module(void *addr)
     x = mod_chain;
     while(x != NULL)
     {
-	if((addr >= (void *)x->mod_start)
-	   && (addr <= (void *)(x->mod_start + x->mod_size)))
+        void *mod_start = x->mod_memory->text;
+	if((addr >= mod_start) && (addr <= (void *)(mod_start + x->mod_size)))
 	{
 	    break;
 	}

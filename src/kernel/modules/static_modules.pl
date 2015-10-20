@@ -7,6 +7,7 @@ my @modules = ();
 
 while (<STDIN>) {
     chomp;
+    next if ($_ =~ /^#/);
     if ($_ =~ /.*\/([^\/]+)/) {
         push(@modules, $1);
     }

@@ -40,8 +40,8 @@ void dump_regs(struct trap_regs *regs, bool halt)
 		struct module *culprit = which_module((void *)regs->eip);
 		if(culprit != NULL)
 		{
-		    printk("EIP is at offset %08X of module `%s'\n",
-			   regs->eip - (u_long)culprit->mod_start,
+		    printk("EIP is at offset %08lX of module `%s'\n",
+			   regs->eip - (u_long)culprit->mod_memory->text,
 			   culprit->name);
 		}
 	    }

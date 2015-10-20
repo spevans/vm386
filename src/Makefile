@@ -70,6 +70,7 @@ imginst:
 clean :
 	find . '(' -name '*~'						\
 		   -o -name '*.[oad]'					\
+		   -o -name '*.ko'					\
 		   -o -name '*.asm'					\
 		   -o -name '*.module'					\
 		   -o -name '*.map'					\

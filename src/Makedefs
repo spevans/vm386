@@ -10,9 +10,8 @@ NM := nm
 AS86 := as86
 LD86 := ld86
 
-MLD := $(TOPDIR)/kernel/modules/mld-elf
-MSTRIP := $(STRIP)
-MSTRIPFLAGS := 
+MODULE_LD_FLAGS := -r -T$(TOPDIR)/kernel/modules/module.linker.script
+MLD := $(TOPDIR)/tools/mld-elf
 
 CFLAGS := -O2 -std=gnu99 -Wall -Wstrict-prototypes $(VMM_CFLAGS) -fno-strict-aliasing -fno-builtin -m32 -march=i386 -Werror -Wall -Wextra -Wno-attributes -fno-common
 
@@ -72,6 +71,5 @@ endif
 # `_FOO_module'.
 %.module :
 	$(LD) $(LDFLAGS) -r $^ -o $@.o
-	$(NM) $@.o | grep -v '_compiled' | sort >$@.map
-	#$(MSTRIP) $(MSTRIPFLAGS) --keep-symbol=kernel --keep-symbol=$*_module -o $@ $@.o
-	#$(MSTRIP) --strip-unneeded -o $@ $@.o
+	$(LD) $(MODULE_LD_FLAGS)  -Map=$@.map $@.o -o $@.ko
+	$(MLD) -o $@ $* $@.ko

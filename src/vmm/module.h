@@ -1,5 +1,8 @@
 /* module.h -- definitions for module handling/calling.
-   John Harper. */
+   John Harper.
+
+   Updated for ELF modules by Simon Evans
+ */
 
 #ifndef _VMM_MODULE_H
 #define _VMM_MODULE_H
@@ -29,17 +32,21 @@
 	    ...
 
    The <default.mk> Makefile contains a rule to link a module from a list
-   of object files. The `mld' program is used to translate the a.out version
-   of the module into a special format (see `struct mod_hdr' below). This
-   rules expects each module to contain a data object `FOO_module' where
-   `FOO' is the stem of the module's file-name. In the above example
-   the module's Makefile would have a rule like:
+   of object files. The object files are linked via ld to create FOO_module.o
+   which is then linked again using the kernel/modules/module.linker.script
+   to merge all of the segments of the same type (ie all .text.* segments become
+   the .text segment, same for .rodata and .data).
+
+   The `mld-elf' program is then used to translate the ELF .o module into
+   into a special format (see `struct mod_hdr' below). This expects each module
+   to contain a data object `FOO_module' where `FOO' is the stem of the module's
+   file-name. In the above example the module's Makefile would have a rule like:
 
 	keyboard.module : $(OBJS)
 
-   The $(OBJS) would be linked into a single relocatable object file by ld,
-   then mld would translate this, looking for a symbol `keyboard_module' (the
-   data object defined above).
+   The $(OBJS) would be linked into a single relocatable object file by ld, then
+   linked again with ld to merge the segments then mld-elf would translate this,
+   looking for a symbol `keyboard_module' (the data object defined above).
 
    Module callers open the module by name, getting a pointer to its structure.
    They can then access any functions/data objects which have been exported
@@ -50,29 +57,48 @@
    Since all symbol values are known at link-time all the loader has to
    do is fix up all the load-position-relative relocations. (See the
    function load.c:load_module().) It also reduces the size of the module
-   files.  */
+   files.
+
+   The format emitted by mld-elf contains three sections, text, rodata and data
+   and relocations for each section. It also allows a symbol lookup although
+   this is currently converted to a number (instead of the symbol being a string)
+   and currently hardcoded to 0 for the `kernel' module pointer which is the only
+   symbol supported.
+
+  */
+
+
+/* The memory regions allocated for the modules code an data. The BSS is allocated
+   as part of the data and is just a pointer into the data section */
+struct module_memory {
+    void *text;
+    void *rodata;
+    void *data;
+    void *bss;
+};
+
 
 struct module {
     struct module *next;
-    const char	  *name;
+    const char    *name;
 
     /* The version number of the module. */
-    u_short	   version;
+    u_short        version;
 
     /* The number of outstanding `users' of this module. If it is -1 then
        the module hasn't finished initialising itself and hence can't be
        opened. */
-    short	   open_count;
+    short          open_count;
 
-    void	  *mod_start;
-    size_t	   mod_size;
+    struct module_memory *mod_memory;
+    size_t         mod_size;
 
     /* When the module is first loaded this function is called (unless it's
        NULL). It should return non-zero if it initialised itself ok, otherwise
        it will be unloaded. Note that at the time this is called the module
        will *not* have been inserted into the kernel's list of loaded
        modules. */
-    bool	    (*init)(void);
+    bool            (*init)(void);
 
     /* This function is called each time the module is `opened'; (when another
        module asks for the address of a module). Generally this only needs to
@@ -86,7 +112,7 @@ struct module {
        decrements the module's open_count.
          If this function is NULL the default action, to decrement
        MOD->open_count is taken.  */
-    void	    (*close)(struct module *mod);
+    void            (*close)(struct module *mod);
 
     /* This function is called when the kernel wants to unload the module. If
        the module's open_count > 0 then it's not possible to expunge and zero
@@ -94,11 +120,11 @@ struct module {
        data structures it allocated and return non-zero (true), then the kernel
        will unload the module from memory.
          If this function is NULL the module will never be expunged. */
-    bool	    (*expunge)(void);
+    bool            (*expunge)(void);
 
      /* Module is statically allocated. Set to FALSE by MODULE_INIT but set to
         correct value (TRUE or FALSE) by kernel initialisation or module load. */
-    bool	      is_static;
+    bool              is_static;
 };
 
 /* Builds a module structure definition from its args (each arg initialises
@@ -108,29 +134,77 @@ struct module {
           (init), (open), (close), (expunge), FALSE }
 
 /* The current version number of all system modules. */
-#define SYS_VER 1
+#define SYS_VER 2
 
-
 /* How modules are stored in files. */
-
-struct mod_hdr {
-    u_short magic;
-    u_char revision;
-    u_char reserved1;
-    u_long init_size;		/* total length of code and data sections */
-    u_long bss_size;		/* length of uninitialised data */
-    u_long reloc_size;		/* length of relocation information */
-    u_char reserved2[32];	/* sizeof(struct mod_hdr) == 48 */
-};
-
 #define MOD_MAGIC 0xDF41
-#define MOD_STRUCT_REV 1
-
-#define M_TXTOFF(mh) (sizeof(struct mod_hdr))
-#define M_RELOFF(mh) (M_TXTOFF(mh) + (mh).init_size)
+#define MOD_STRUCT_REV 2
 #define M_BADMAG(mh) ((mh).magic != MOD_MAGIC)
 
-
+enum program_section {
+    text_section,
+    rodata_section,
+    data_section,
+    bss_section
+};
+
+/* Each section has an array of relocation entries to fixup its pointers */
+struct relocation {
+        uint8_t info;           /* bit 4 type 0 = symbol flag, 1 = relocation
+                                   bit 3 absolute/relative relocation
+                                   bits 0-2 progam section */
+        uint32_t offset;
+        int32_t value;          /* Addend for relocation or symbol ID if symbol */
+} __attribute__ ((packed));
+
+struct section {
+    uint32_t size;              /* object size */
+    uint32_t offset;            /* offset into module file to start of object code/data */
+    uint32_t reloc_cnt;         /* number of entries */
+    uint32_t reloc_off;         /* offset into module file for array of struct relocations */
+} __attribute__ ((packed));
+
+struct mod_hdr_elf {
+    uint16_t magic;
+    uint8_t revision;
+    uint8_t reserved1;
+    struct section text;
+    struct section rodata;
+    struct section data;
+    uint32_t bss_size;
+    enum program_section mod_section;   /* the section containing the module header */
+    uint32_t mod_offset;                /* offset into section to module header */
+} __attribute__ ((packed));
+
+
+/* Helper functions to get/set the relocation.info value */
+static inline enum program_section relocation_section(struct relocation *r)
+{
+        return (enum program_section)(r->info & 0x7);
+}
+
+static inline bool is_absolute_relocation(struct relocation *r)
+{
+        return (r->info & 8);
+}
+
+
+static inline bool is_relocation(struct relocation *r)
+{
+        return (r->info & 16);
+}
+
+static inline uint8_t relocation_info(enum program_section section, bool absolute,
+                                       bool relocation)
+{
+        uint8_t result = 0;
+        if (relocation) {
+                result = 16 | section;
+                result |= absolute ? 8 : 0;
+        }
+        return result;
+}
+
 
 #ifdef KERNEL
 
@@ -150,8 +224,6 @@ extern struct module *which_module(void *addr);
 /* from load.c */
 extern struct module *load_module(const char *name);
 extern void free_module(struct module *mod);
-
-extern struct mod_code_hdr __first_static_module, __last_static_module;
 
 #endif /* KERNEL */
 #endif /* _VMM_MODULE_H */
