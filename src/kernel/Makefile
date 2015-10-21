@@ -17,7 +17,7 @@ endif
 .PHONY : kernel.o
 kernel.o :
 	set -e; for dir in $(SUBDIRS); do $(MAKE) -C $$dir; done
-	$(XLD) $(LDFLAGS) init/startup.o $(OBJS) $(ARCHIVES) -o kernel.o
+	ld $(LDFLAGS) init/startup.o $(OBJS) $(ARCHIVES) -o kernel.o
 
 ../output/kernel.bin : kernel.o ../tools/e2b
 	../tools/e2b kernel.o ../output/kernel.bin
