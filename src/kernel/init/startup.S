@@ -3,7 +3,6 @@
 #include <vmm/tasks.h>
 
 .text	
-.globl _start
 .globl _end_of_kernel
 .globl _kernel_page_dir
 .globl _main
@@ -13,12 +12,11 @@
 .globl _root_dev
 
 
-_start:
 _main:					# offsets 
 	.word	start_of_kernel		# 0   0x00
 	.word	0x18			# 2   0x02
 _end_of_kernel:
-	.long	_end			# 4   0x04
+	.long	__end			# 4   0x04
 		
 GDTInfo:
 	.word	(GDTEnd-_GDT)-1		# 8   0x08
@@ -67,8 +65,8 @@ start_of_kernel:
 
 	/* Clear BSS first so that there are no surprises... */
         xorl %eax,%eax
-        movl $_edata,%edi
-        movl $_end,%ecx
+        movl $__edata,%edi
+        movl $__end,%ecx
         subl %edi,%ecx
         cld
         rep
