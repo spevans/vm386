@@ -20,7 +20,7 @@ include $(TOPDIR)/Makedefs
 # Compiling for local execution
 XCC = $(CC)
 
-CFLAGS += -g -DTEST -DTEST_FS -DTEST_SHELL -DFS_MODULE -DSHELL_MODULE -DKERNEL
+CFLAGS += -g -DTEST -DTEST_FS -DTEST_SHELL -DFS_MODULE -DSHELL_MODULE -DKERNEL -Wno-unused-parameter
 
 fs : $(OBJS)
 	$(CC) $(LDFLAGS) -o $@ $^

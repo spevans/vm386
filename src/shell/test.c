@@ -20,7 +20,6 @@ main(int argc, char **argv)
     {
 #ifdef TEST_FS
 	char *file = "test_dev.image";
-	u_long blocks = 0;
 	bool mkfs = FALSE;
 	u_long reserved = 0;
 	argc--; argv++;
@@ -37,13 +36,6 @@ main(int argc, char **argv)
 			file = argv[0];
 		    }
 		    break;
-		case 's':
-		    if(argc >= 2)
-		    {
-			argc--; argv++;
-			blocks = atol(argv[0]);
-		    }
-		    break;
 		case 'm':
 		    mkfs = TRUE;
 		    break;
@@ -55,7 +47,7 @@ main(int argc, char **argv)
 		    }
 		    break;
 		case '?':
-		    fprintf(stderr, "usage: %s [-f DEVICE-IMAGE] [-s BLOCKS] [-m [-r RESERVED-BLOCKS]]\n", prog_name);
+		    fprintf(stderr, "usage: %s [-f DEVICE-IMAGE] [-m [-r RESERVED-BLOCKS]]\n", prog_name);
 		    return 1;
 		default:
 		    fprintf(stderr, "test_fs: unknown option: %s", *argv);
@@ -66,7 +58,7 @@ main(int argc, char **argv)
 	}
 	fs_init();
 	add_fs_commands();
-	if(!open_test_dev(file, blocks, mkfs, reserved))
+	if(!open_test_dev(file, mkfs, reserved))
 	    return 5;
 #endif /* TEST_FS */
 	init_shell_struct(&test_shell);

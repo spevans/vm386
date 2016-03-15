@@ -9,13 +9,15 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <fcntl.h>
-#include <sys/stat.h>
 #include <errno.h>
-
-
+#include <sys/stat.h>
+#include <sys/ioctl.h>
+#include <linux/fs.h>
 
 
 int dev_fd = -1;
+// For file images this will be 512 for skip the mbr
+off_t dev_start = 0;
 size_t dev_size;
 
 static long dev_read_blocks(void *unused, blkno blk, void *buf, int count);
@@ -50,7 +52,7 @@ cmd_newdisk(struct shell *sh, int argc, char **argv)
 }
 
 bool
-open_test_dev(const char *file, u_long blocks, bool make_fs, u_long reserved)
+open_test_dev(const char *file, bool make_fs, u_long reserved)
 {
     struct stat stat_buf;
     dev_fd = open(file, O_RDWR);
@@ -72,20 +74,25 @@ open_test_dev(const char *file, u_long blocks, bool make_fs, u_long reserved)
     test_dev->read_blocks = dev_read_blocks;
     test_dev->write_blocks = dev_write_blocks;
     test_dev->test_media = dev_test_media;
-    if(blocks == 0)
+    if(fstat(dev_fd, &stat_buf))
     {
-	if(fstat(dev_fd, &stat_buf))
-	{
-	    perror("fstat");
-	    exit(10);
-	}
-	dev_size = stat_buf.st_size / FS_BLKSIZ;
+	perror("fstat");
+        exit(10);
     }
-    else
-	dev_size = blocks;
-#if 0
-    printf("dev_size: %d\n", dev_size);
-#endif
+    if (S_ISBLK(stat_buf.st_mode))
+    {
+        unsigned long long blocks;
+        if (ioctl(dev_fd, BLKGETSIZE64, &blocks) < 0) {
+            perror("ioctl(BLKGETSIZE64");
+            return FALSE;
+        }
+        dev_size = blocks / FS_BLKSIZ;
+    } else {
+        // For regular files skip the 'mbr' at the beginning
+        dev_size = (stat_buf.st_size - 512) / FS_BLKSIZ;
+        dev_start = 512;
+    }
+
     if(!make_fs || mkfs(test_dev, dev_size, reserved))
     {
 	add_device(test_dev);
@@ -117,7 +124,7 @@ dev_read_blocks(void *unused, blkno blk, void *buf, int count)
     long actual;
     if(no_disk)
 	return -E_NODISK;
-    if(lseek(dev_fd, blk * FS_BLKSIZ, SEEK_SET) < 0)
+    if(lseek(dev_fd, dev_start + (blk * FS_BLKSIZ), SEEK_SET) < 0)
     {
 	perror("read_block:lseek");
 	abort();
@@ -141,7 +148,7 @@ dev_write_blocks(void *unused, blkno blk, void *buf, int count)
     long actual;
     if(no_disk)
 	return -E_NODISK;
-    if(lseek(dev_fd, blk * FS_BLKSIZ, SEEK_SET) < 0)
+    if(lseek(dev_fd, dev_start + (blk * FS_BLKSIZ), SEEK_SET) < 0)
     {
 	perror("write_block:lseek");
 	abort();

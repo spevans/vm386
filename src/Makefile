@@ -8,7 +8,8 @@
 # 0 = drive a 128 = fixed disk 1 129 = fixed disk 2 etc
 # only works for floppy at the mo
 
-FS = ../tools/fs
+ROOT_DEV := output/image.hd
+FS := shell/shell
 
 SUBDIRS := tools start16 drivers syslogd spooler fs shell debugger test kernel
 
@@ -22,50 +23,47 @@ all : kernel
 kernel :
 	set -e; for dir in $(SUBDIRS); do $(MAKE) -C $$dir; done
 
-image :
-	tools/makeimage output/bootsect.bin output/start16.bin		\
-	 output/kernel.bin $(VMM_BOOT) > image 
 
-sys :
-	tools/sysdisk output/start16.bin output/kernel.bin		\
-	 $(VMM_ROOT) /dev/$(subst :,,$(VMM_BOOT))
+installmbr:
+	tools/makeimage output/mbr.bin $(ROOT_DEV)
 
-imgsys:
-	tools/sysdisk output/start16.bin output/kernel.bin              \
-	 fd0 root.image
+mkfs:
+	shell/shell -f $(ROOT_DEV) -m -r 256 </dev/null
 
-disk : image
-	dd if=image of=/dev/fd0 bs=512
+bootable:
+	tools/sysdisk output/start16.bin output/kernel.bin $(ROOT_DEV)
+
+image: installmbr root install bootable
+
 
 root:
 	(echo "cd tst:" ; echo "mkdir lib" ; echo "mkdir spool" ; \
          echo "mkdir adm") | \
-	$(FS) -f /dev/$(subst :,,$(VMM_ROOT)) -s $(VMM_ROOT_SIZE) -m -r 256
+	$(FS) -f $(ROOT_DEV) -m -r 256
 
 getlog: 
 	(echo "cd tst:" ; echo "cd adm"; echo "type syslog") | \
-	$(FS) -f /dev/$(subst :,,$(VMM_ROOT)) -s $(VMM_ROOT_SIZE) | \
-	tail +4 > log
+	$(FS) -f $(ROOT_DEV) | tail +4 > log
 
 usefs:
-	$(FS) -f /dev/$(subst :,,$(VMM_ROOT)) -s $(VMM_ROOT_SIZE)
+	$(FS) -f $(ROOT_DEV)
 
 geterr:
-	(echo "cd tst:" ; echo "type err") |	\
-	$(FS) -f /dev/$(subst :,,$(VMM_ROOT)) -s $(VMM_ROOT_SIZE) >err
+	(echo "cd tst:" ; echo "type err") | \
+	$(FS) -f $(ROOT_DEV) >err
 
 imgroot:
-	$(FS) -f root.image -s $(VMM_ROOT_SIZE) -m -r 256
+	$(FS) -f $(ROOT_DEV)  -m -r 256
 
-install :
+install:
 	(echo "cd tst:" ;				\
 	 sed -e 's/.*\/\([a-z]*.module\)/ucp \0 \/lib\/\1/' <DYNAMIC)	\
-	| $(FS) -f /dev/$(subst :,,$(VMM_ROOT)) -s $(VMM_ROOT_SIZE)
+	| $(FS) -f $(ROOT_DEV)
 
 imginst:
 	(echo "cd tst:" ; echo "mkdir lib";				\
 	 sed -e 's/.*\/\([a-z]*.module\)/ucp \0 \/lib\/\1/' <DYNAMIC)	\
-	| $(FS) -f root.image -s $(VMM_ROOT_SIZE)
+	| $(FS) -f root.image
 
 clean :
 	find . '(' -name '*~'						\

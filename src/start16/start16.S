@@ -354,7 +354,7 @@ bodge:		.ascii	'Debodging system...'
 		db	0x00
 proot:		.ascii	'Patching in root device...'
 		db	0x00
-root_dev:	.ascii	"rd0:"
+root_dev:	.ascii	"hda1:"
 		db	0x00	
 
 .text

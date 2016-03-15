@@ -39,7 +39,7 @@ int main(int argc, char *argv[])
 	fread(&buffer, HEADER_SIZE, 1, fpin);
         uint32_t magic = data(buffer, 0);
 
-        printf("sizeof = %d Magic = %8.8X\n", sizeof(magic), magic);
+        printf("sizeof = %zu Magic = %4.4X\n", sizeof(magic), magic);
         if (magic != HEADER_MAGIC)
 		quit("bad header - cant find magic number\n");
 

@@ -15,6 +15,12 @@
 # include <vmm/shell.h>
 #endif
 
+// MBR partition type flag
+#define VMM_PARTITION_TYPE 0x30
+
+// MBR offset to partition table
+#define PART_TABLE_OFFSET 0x1BE
+
 /* Perhaps it would be better to use 1024-byte blocks.. The value 512 isn't
    hardcoded anywhere so it would be easy to switch.. (It has to be some
    power of 2 though.) */
@@ -398,7 +404,7 @@ extern int fs_fprintf(struct file *fh, const char *fmt, ...);
 
 #ifdef TEST
   /* from test_dev.c */
-  extern bool open_test_dev(const char *file, u_long blocks, bool mkfs, u_long reserved);
+  extern bool open_test_dev(const char *file, bool mkfs, u_long reserved);
   extern void close_test_dev(void);
 
   /* from ../shell/test.c */

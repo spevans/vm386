@@ -1,7 +1,14 @@
 CFLAGS = -traditional
 
-all: ../output/bootsect.bin ../output/start16.bin ../fs/bootsect.h
+all: ../output/bootsect.bin ../output/start16.bin ../fs/bootsect.h ../output/mbr.bin
 
+
+
+../output/mbr.bin: mbr.S
+	gcc -E $(CFLAGS) $< -o mbr.asm
+	as86 -0 -a mbr.asm -o mbr.o
+	ld86 -0 -s mbr.o -o mbr.out
+	../tools/bbin mbr.out ../output/mbr.bin
 
 ../output/bootsect.bin : bootsect.o
 	ld86 -0 -s bootsect.o -o bootsect.out

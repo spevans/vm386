@@ -151,7 +151,6 @@ struct msdos_partition {
 
 #define TEST_SIG(blk) (*(u_short *)(((char *)(blk)) + 510) == 0xAA55)
 
-#define VMM_SYS 0x30
 
 static hd_partition_t *
 new_partition(struct msdos_partition *p, int minor, hd_dev_t *hd,
@@ -167,7 +166,7 @@ new_partition(struct msdos_partition *p, int minor, hd_dev_t *hd,
 	ksprintf(par->name, "%s%d", hd->name, minor);
 	kprintf(" %s", par->name);
 	add_partition(par);
-	if(p->system == VMM_SYS)
+	if(p->system == VMM_PARTITION_TYPE)
 	{
 	    if(hd_mount_partition(par, FALSE))
 		kprintf(":");
@@ -204,7 +203,7 @@ hd_add_dev(hd_dev_t *hd)
        && TEST_SIG(mbr))
     {
 	int pri, ext;
-	struct msdos_partition *p = (struct msdos_partition *)(mbr + 0x1BE);
+	struct msdos_partition *p = (struct msdos_partition *)(mbr + PART_TABLE_OFFSET);
 	for(pri = 1, ext = 5; pri < 5; pri++, p++)
 	{
 	    if(p->system == 0 || p->total_blocks == 0)
@@ -219,7 +218,7 @@ hd_add_dev(hd_dev_t *hd)
 		while(1)
 		{
 		    u_char embr[512];
-		    struct msdos_partition *p = (struct msdos_partition *)(embr + 0x1BE);
+		    struct msdos_partition *p = (struct msdos_partition *)(embr + PART_TABLE_OFFSET);
 		    if(!hd->read_blocks(hd, embr, curr_start, 1)
 		       || !TEST_SIG(embr))
 		    {
