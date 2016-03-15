@@ -278,7 +278,7 @@ read_elf_obj(struct mod_obj *m)
         for (idx = 0; idx < elf_hdr->e_shnum; idx++) {
                 Elf32_Shdr *shdr = section_headers + idx;
                 if (verbosity > 2) {
-                        printf("[%2.2d] ", idx);
+                        printf("[%2.2zu] ", idx);
                         dump_section_header(m->file, section_headers+idx);
                 }
                 char *name = section_name(m->file, shdr);
@@ -349,8 +349,8 @@ update_module_symbol(struct mod_obj *m, struct mod_hdr_elf *hdr)
         VB(1, "%s section = %d offset = %08X size=%X\n", symname,
            modsym->st_shndx, modsym->st_value, modsym->st_size);
         if (modsym->st_size < sizeof(struct module)) {
-                fprintf(stderr, "%s is the wrong size (%d) should be at least %d\n", symname,
-                        modsym->st_size, sizeof(struct module));
+                fprintf(stderr, "%s is the wrong size (%u) should be at least %zu\n",
+                        symname, modsym->st_size, sizeof(struct module));
                 return FALSE;
         }
         Elf32_Shdr *section = section_header(m->file, modsym->st_shndx);

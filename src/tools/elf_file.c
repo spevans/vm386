@@ -188,7 +188,7 @@ dump_elf_header(struct elf_file *file)
         printf("Program header table offset: 0x%8.8X\n", elf_hdr->e_phoff);
         printf("Section header table offset: 0x%8.8X\n", elf_hdr->e_shoff);
         printf("Processor flags: 0x%8.8X\n", elf_hdr->e_flags);
-        printf("ELF header size: %u (%u)\n", elf_hdr->e_ehsize, sizeof(Elf32_Ehdr));
+        printf("ELF header size: %u (%zu)\n", elf_hdr->e_ehsize, sizeof(Elf32_Ehdr));
         printf("Program header table entry size/count: %d/%d\n",
                elf_hdr->e_phentsize, elf_hdr->e_phnum);
         printf("Section header table entry size/count: %d/%d\n",
@@ -262,7 +262,7 @@ dump_relocations(struct elf_file *file, Elf32_Shdr *header)
         printf("\nRelocation section: %s [%s]\n", name, type_name);
 
         if (header->sh_entsize != sizeof(Elf32_Rel)) {
-                fprintf(stderr, "table entry size (%d) is not sizeof(Elf32_Rel) [%d]\n",
+                fprintf(stderr, "table entry size (%d) is not sizeof(Elf32_Rel) [%zu]\n",
                         header->sh_entsize, sizeof(Elf32_Rel));
                 return;
         }
@@ -281,7 +281,7 @@ dump_relocations(struct elf_file *file, Elf32_Shdr *header)
                 Elf32_Rel *entry = relocations + idx;
                 Elf32_Sym *symbol = symbols + ELF32_R_SYM(entry->r_info);
 
-                printf("%4.4d: %-24s %8.8X %4.4X %6X   %-16s %s\n", idx,
+                printf("%4.4zu: %-24s %8.8X %4.4X %6X   %-16s %s\n", idx,
                        symbol_name(file, symbol), symbol->st_value,
                        symbol->st_size, entry->r_offset,
                        section_name(file, section_header(file, symbol->st_shndx)),
@@ -319,7 +319,7 @@ dump_symbols(struct elf_file *file)
         for (size_t idx = 0; idx < entry_count; idx++) {
                 Elf32_Sym *symbol = symbols+idx;
 
-                printf("%4.4d: %-20s %08X %04X %d\n", idx, symbol_name(file, symbol),
+                printf("%4.4zu: %-20s %08X %04X %d\n", idx, symbol_name(file, symbol),
                        symbol->st_value, symbol->st_size, symbol->st_shndx);
         }
 }
@@ -400,7 +400,7 @@ validate_elf_header(struct elf_file *file)
         }
 
         if (sizeof(Elf32_Shdr) != elf_hdr->e_shentsize) {
-                fprintf(stderr, "Section header table entry size is wrong (%u != %u)\n",
+                fprintf(stderr, "Section header table entry size is wrong (%u != %zu)\n",
                         elf_hdr->e_shentsize, sizeof(Elf32_Shdr));
                 return 0;
         }

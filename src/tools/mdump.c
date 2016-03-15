@@ -58,7 +58,7 @@ dump_section(char *name, struct section *section, uint8_t *file)
         for (size_t off = 0; off < section->size; off++) {
                 if (off % 16 == 0) {
                         memset(ascii, 0, 17);
-                        printf("%s%8.8X ", off ? "\n" : "", off);
+                        printf("%s%8.8zX ", off ? "\n" : "", off);
                 }
                 uint8_t d = data[off];
                 printf("%2.2X ", d);
@@ -92,7 +92,7 @@ dump_relocations(char *name, struct section *section, uint8_t *file)
         struct relocation *relocations = (struct relocation *)(file + section->reloc_off);
         for (size_t idx = 0; idx < section->reloc_cnt; idx++) {
                 struct relocation *r = relocations + idx;
-                printf("[%04d] %8.8X %8.8X %s   %s\n", idx, r->offset, r->value,
+                printf("[%04zu] %8.8X %8.8X %s   %s\n", idx, r->offset, r->value,
                        is_relocation(r) ?
                        (is_absolute_relocation(r) ?  "ABS" : "REL")
                        : "SYM",

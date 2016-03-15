@@ -77,6 +77,7 @@ clean :
 		   -o -name '*.out'					\
 		   -o -name 'err'					\
 		   -o -name core ')' -print | xargs rm -f
+	rm -f output/*
 	make -C tools clean
 	make -C drivers clean
 	make -C kernel clean

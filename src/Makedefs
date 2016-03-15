@@ -10,10 +10,12 @@ NM := nm
 AS86 := as86
 LD86 := ld86
 
+LDFLAGS := -m elf_i386
 MODULE_LD_FLAGS := -r -T$(TOPDIR)/kernel/modules/module.linker.script
 MLD := $(TOPDIR)/tools/mld-elf
 
-CFLAGS := -O2 -std=gnu99 -Wall -Wstrict-prototypes $(VMM_CFLAGS) -fno-strict-aliasing -fno-builtin -m32 -march=i386 -Werror -Wall -Wextra -Wno-attributes -fno-common
+CFLAGS := -O2 -std=gnu99 -Wstrict-prototypes $(VMM_CFLAGS) -fno-strict-aliasing -fno-builtin -m32 -march=i386 -Werror -Wall -Wextra -Wno-attributes -fno-common
+
 
 ifndef TEST
 CFLAGS += -fomit-frame-pointer
@@ -28,8 +30,8 @@ endif
 %.o : %.asm
 	$(AS) -o $@ $<
 
-%.o : %.S
-	$(CC) $(CPPFLAGS) -c -o $@ $<
+%.o: %.S
+	$(CC) $(CPPFLAGS) -m32 -march=i386 -c -o $@ $<
 
 %.map : %.o
 	$(NM) $< | grep -v '_compiled' | sort >$@
@@ -58,7 +60,7 @@ endif
 #	include $(SRCS:.c=.d)
 #
 %.d : %.c
-	$(SHELL) -ec '$(CC) -M $(CPPFLAGS) $< | sed '\''s/$*.o/& $@/g'\'' > $@'
+	$(SHELL) -ec '$(CC) -M $(CPPFLAGS) -m32 -march=i386 $< | sed '\''s/$*.o/& $@/g'\'' > $@'
 
 # Definitions for linking modules. Basically each module has something like
 # the following in its Makefile:
@@ -71,5 +73,5 @@ endif
 # `_FOO_module'.
 %.module :
 	$(LD) $(LDFLAGS) -r $^ -o $@.o
-	$(LD) $(MODULE_LD_FLAGS)  -Map=$@.map $@.o -o $@.ko
+	$(LD) $(LDFLAGS) $(MODULE_LD_FLAGS)  -Map=$@.map $@.o -o $@.ko
 	$(MLD) -o $@ $* $@.ko

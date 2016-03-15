@@ -1,4 +1,5 @@
 ENTRY(main)
+OUTPUT_ARCH(i386)
 OUTPUT_FORMAT(binary)
 INPUT(init/startup.o   init/init.o  alloc/alloc.o  misc/misc.o  mm/mm.o  traps/traps.o  tasks/tasks.o  modules/modules.o )
 

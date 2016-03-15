@@ -20,7 +20,7 @@ static_modules.h : $(TOPDIR)/STATIC
 module.c : static_modules.h
 
 modules.o : $(OBJS) $(STATIC_MODS)
-	$(LD) -r -o $@ $(filter %.o, $^)
+	$(LD) $(LDFLAGS) -r -o $@ $(filter %.o, $^)
 
 clean :
 	rm -f *~ *.[od] example.module objlist core static_modules.h

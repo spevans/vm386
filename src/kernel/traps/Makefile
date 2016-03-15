@@ -9,7 +9,7 @@ include $(TOPDIR)/Makedefs
 CFLAGS += -DKERNEL
 
 traps.o : $(OBJS)
-	$(LD) -r -o traps.o $(OBJS)
+	$(LD) $(LDFLAGS) -r -o traps.o $(OBJS)
 
 clean :
 	rm -f *~ *.[od]
