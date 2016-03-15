@@ -20,7 +20,8 @@ all : kernel
 
 .PHONY : kernel image sys disk root install rclean clean realclean nobak tar
 
-kernel :
+kernel:
+	mkdir -p output
 	set -e; for dir in $(SUBDIRS); do $(MAKE) -C $$dir; done
 
 
@@ -80,6 +81,7 @@ clean :
 	make -C drivers clean
 	make -C kernel clean
 	make -C fs clean
+	make -C shell clean
 
 rclean :
 	set -e; for dir in $(SUBDIRS); do $(MAKE) -C $$dir clean; done
