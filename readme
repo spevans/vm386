@@ -1,1 +1,10 @@
-The files on this disk are gzip'd tar files
+
+# for building 32bit on 64bit linux
+# apt-get install libc6-dev-i386 bin86
+
+$ cd src
+$ make
+$ dd if=/dev/zero of=output/image.hd bs=1024 count=10240
+$ make image
+$ qemu-system-x86_64 -hda output/image.hd
+
